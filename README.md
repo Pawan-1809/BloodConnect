@@ -2,6 +2,10 @@
 
 A comprehensive full-stack Blood Donation Management Platform built with the MERN stack (MongoDB, Express.js, React, Node.js). This platform connects blood donors, receivers, hospitals/blood banks, and administrators in a seamless ecosystem designed to save lives.
 
+## 📘 Interactive Guide
+
+See [PROJECT_GUIDE.md](PROJECT_GUIDE.md) for a clean runbook (setup, env, run commands, troubleshooting).
+
 ![BloodConnect Banner](https://via.placeholder.com/1200x400/DC2626/FFFFFF?text=BloodConnect+-+Saving+Lives+Together)
 
 ## 🌟 Features
