@@ -1,0 +1,49 @@
+{
+  "name": "blood-donation-platform",
+  "version": "1.0.0",
+  "description": "Full-stack Blood Donation Management Platform using MERN stack",
+  "main": "server/index.js",
+  "engines": {
+    "node": ">=18 <21",
+    "npm": ">=8"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "server": "nodemon server/index.js",
+    "client": "cd client && npm start",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "install-all": "npm install && cd client && npm install",
+    "build": "cd client && npm run build"
+  },
+  "keywords": [
+    "blood-donation",
+    "mern",
+    "healthcare",
+    "mongodb",
+    "react",
+    "nodejs"
+  ],
+  "author": "BloodConnect Team",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-validator": "^7.0.1",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.0.3",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^6.9.7",
+    "socket.io": "^4.6.1",
+    "twilio": "^4.19.3",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "compression": "^1.7.4",
+    "node-cron": "^3.0.3"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.0.2"
+  }
+}

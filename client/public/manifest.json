@@ -1,0 +1,9 @@
+{
+  "short_name": "BloodConnect",
+  "name": "BloodConnect - Blood Donation Platform",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#dc2626",
+  "background_color": "#ffffff",
+  "icons": []
+}
