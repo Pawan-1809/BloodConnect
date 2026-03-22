@@ -18,22 +18,38 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('token'));
 
+  const syncAuthState = useCallback(async (authToken, fallbackUser = null) => {
+    try {
+      api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
+
+      const response = await api.get('/auth/me', {
+        params: { _ts: Date.now() },
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+
+      if (response?.data?.user) {
+        setUser(response.data.user);
+        setDonorProfile(response.data.donorProfile || null);
+        return response.data.user;
+      }
+
+      setUser(fallbackUser);
+      setDonorProfile(null);
+      return fallbackUser;
+    } catch (error) {
+      setUser(fallbackUser);
+      setDonorProfile(null);
+      return fallbackUser;
+    }
+  }, []);
+
   // Check authentication on mount
   useEffect(() => {
     const checkAuth = async () => {
       const storedToken = localStorage.getItem('token');
       if (storedToken) {
         try {
-          api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-          const response = await api.get('/auth/me', {
-            params: { _ts: Date.now() },
-            headers: { 'Cache-Control': 'no-cache' }
-          });
-
-          if (response?.data?.user) {
-            setUser(response.data.user);
-            setDonorProfile(response.data.donorProfile);
-          }
+          await syncAuthState(storedToken);
           setToken(storedToken);
         } catch (error) {
           console.error('Auth check failed:', error);
@@ -47,7 +63,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     checkAuth();
-  }, []);
+  }, [syncAuthState]);
 
   // Login function
   const login = useCallback(async (email, password) => {
@@ -60,16 +76,16 @@ export const AuthProvider = ({ children }) => {
       api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
       
       setToken(newToken);
-      setUser(userData);
+      const syncedUser = await syncAuthState(newToken, userData);
 
-      toast.success(`Welcome back, ${userData.firstName}!`);
-      return { success: true, user: userData };
+      toast.success(`Welcome back, ${syncedUser?.firstName || userData.firstName}!`);
+      return { success: true, user: syncedUser || userData };
     } catch (error) {
       const message = error.response?.data?.message || 'Login failed';
       toast.error(message);
       return { success: false, message };
     }
-  }, []);
+  }, [syncAuthState]);
 
   // Register function
   const register = useCallback(async (userData) => {
@@ -86,16 +102,16 @@ export const AuthProvider = ({ children }) => {
       api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
       
       setToken(newToken);
-      setUser(newUser);
+      const syncedUser = await syncAuthState(newToken, newUser);
 
       toast.success('Registration successful! Welcome to BloodConnect.');
-      return { success: true, user: newUser };
+      return { success: true, user: syncedUser || newUser };
     } catch (error) {
       const message = error.response?.data?.message || 'Registration failed';
       toast.error(message);
       return { success: false, message };
     }
-  }, []);
+  }, [syncAuthState]);
 
   // Logout function
   const logout = useCallback(async () => {

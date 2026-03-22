@@ -34,12 +34,14 @@ const HospitalProfile = lazy(() => import('./pages/hospital/HospitalProfile'));
 const ManageStock = lazy(() => import('./pages/hospital/ManageStock'));
 const ManageRequests = lazy(() => import('./pages/hospital/ManageRequests'));
 const ManageDonations = lazy(() => import('./pages/hospital/ManageDonations'));
+const HospitalSchedules = lazy(() => import('./pages/hospital/HospitalSchedules'));
 
 // Admin Pages
 const UserManagement = lazy(() => import('./pages/admin/UsersManagement'));
 const HospitalManagement = lazy(() => import('./pages/admin/HospitalsManagement'));
 const RequestManagement = lazy(() => import('./pages/admin/RequestsManagement'));
 const Analytics = lazy(() => import('./pages/admin/AnalyticsPage'));
+const AdminAnnouncements = lazy(() => import('./pages/admin/AdminAnnouncements'));
 
 // Shared Pages
 const Schedules = lazy(() => import('./pages/shared/Schedules'));
@@ -50,6 +52,7 @@ const HospitalDetail = lazy(() => import('./pages/shared/HospitalDetail'));
 const Notifications = lazy(() => import('./pages/shared/Notifications'));
 const Settings = lazy(() => import('./pages/shared/Settings'));
 const PublicContentPage = lazy(() => import('./pages/public/PublicContentPage'));
+const ResourcesHub = lazy(() => import('./pages/public/ResourcesHub'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 function App() {
@@ -87,9 +90,11 @@ function App() {
         
         {/* Public pages that work with or without auth */}
         <Route path="/hospitals" element={<Layout><HospitalList /></Layout>} />
+        <Route path="/blood-banks" element={<Navigate to="/hospitals?type=blood_bank" replace />} />
         <Route path="/hospitals/:id" element={<Layout><HospitalDetail /></Layout>} />
         <Route path="/schedules" element={<Layout><Schedules /></Layout>} />
         <Route path="/schedules/:id" element={<Layout><ScheduleDetail /></Layout>} />
+        <Route path="/resources" element={<Layout showSidebar={false}><ResourcesHub /></Layout>} />
         <Route path="/about" element={<Layout showSidebar={false}><PublicContentPage pageKey="about" /></Layout>} />
         <Route path="/how-it-works" element={<Layout showSidebar={false}><PublicContentPage pageKey="howItWorks" /></Layout>} />
         <Route path="/leaderboard" element={<Layout showSidebar={false}><PublicContentPage pageKey="leaderboard" /></Layout>} />
@@ -113,6 +118,7 @@ function App() {
           <Route path="/donor/profile" element={<Layout><DonorProfile /></Layout>} />
           <Route path="/donor/history" element={<Layout><DonationHistory /></Layout>} />
           <Route path="/donor/find-requests" element={<Layout><FindRequests /></Layout>} />
+          <Route path="/schedules/my-appointments" element={<Layout><Schedules /></Layout>} />
         </Route>
 
         {/* Protected - Receiver Routes */}
@@ -121,6 +127,7 @@ function App() {
           <Route path="/receiver/create-request" element={<Layout><CreateRequest /></Layout>} />
           <Route path="/receiver/my-requests" element={<Layout><MyRequests /></Layout>} />
           <Route path="/receiver/find-donors" element={<Layout><FindDonors /></Layout>} />
+          <Route path="/receiver/profile" element={<Layout><Settings /></Layout>} />
         </Route>
 
         {/* Protected - Hospital Routes */}
@@ -128,17 +135,28 @@ function App() {
           <Route path="/hospital/dashboard" element={<Layout><HospitalDashboard /></Layout>} />
           <Route path="/hospital/profile" element={<Layout><HospitalProfile /></Layout>} />
           <Route path="/hospital/stock" element={<Layout><ManageStock /></Layout>} />
+          <Route path="/hospital/stock/add" element={<Navigate to="/hospital/stock" replace />} />
+          <Route path="/hospital/stock/history" element={<Navigate to="/hospital/stock" replace />} />
           <Route path="/hospital/requests" element={<Layout><ManageRequests /></Layout>} />
           <Route path="/hospital/donations" element={<Layout><ManageDonations /></Layout>} />
+          <Route path="/hospital/schedules" element={<Layout><HospitalSchedules /></Layout>} />
+          <Route path="/hospital/blood-drives" element={<Layout><HospitalSchedules /></Layout>} />
+          <Route path="/hospital/analytics" element={<Navigate to="/hospital/dashboard" replace />} />
+          <Route path="/hospital/reports" element={<Navigate to="/hospital/dashboard" replace />} />
         </Route>
 
         {/* Protected - Admin Routes */}
         <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
           <Route path="/admin/dashboard" element={<Layout><AdminDashboard /></Layout>} />
+          <Route path="/admin/profile" element={<Layout><Settings /></Layout>} />
           <Route path="/admin/users" element={<Layout><UserManagement /></Layout>} />
           <Route path="/admin/hospitals" element={<Layout><HospitalManagement /></Layout>} />
           <Route path="/admin/requests" element={<Layout><RequestManagement /></Layout>} />
           <Route path="/admin/analytics" element={<Layout><Analytics /></Layout>} />
+          <Route path="/admin/verifications" element={<Navigate to="/admin/hospitals" replace />} />
+          <Route path="/admin/announcements" element={<Layout><AdminAnnouncements /></Layout>} />
+          <Route path="/admin/reports" element={<Navigate to="/admin/analytics" replace />} />
+          <Route path="/admin/settings" element={<Layout><Settings /></Layout>} />
         </Route>
 
         {/* Protected - Shared Routes (require any authenticated user) */}

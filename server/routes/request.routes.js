@@ -343,6 +343,13 @@ router.put('/:id/status', protect, authorize('hospital', 'admin'), asyncHandler(
       oldStatus,
       newStatus: status
     });
+
+    req.io.to(`request_${request._id}`).emit('request_updated', {
+      requestId: request._id,
+      type: 'status_changed',
+      oldStatus,
+      newStatus: status
+    });
   }
 
   res.json({
@@ -429,6 +436,12 @@ router.post('/:id/respond', protect, authorize('donor'), asyncHandler(async (req
         requestId: request._id,
         donorAccepted: true
       });
+
+      req.io.to(`request_${request._id}`).emit('request_updated', {
+        requestId: request._id,
+        type: 'donor_response',
+        donorAccepted: true
+      });
     }
   }
 
@@ -470,6 +483,14 @@ router.delete('/:id', protect, asyncHandler(async (req, res) => {
   });
 
   await request.save();
+
+  if (req.io) {
+    req.io.to(`request_${request._id}`).emit('request_updated', {
+      requestId: request._id,
+      type: 'cancelled',
+      newStatus: request.status
+    });
+  }
 
   res.json({
     success: true,

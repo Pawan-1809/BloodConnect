@@ -1,27 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import CountUp from 'react-countup';
 import {
   HiUserGroup,
-  HiOfficeBuilding,
-  HiClipboardList,
-  HiTrendingUp,
-  HiTrendingDown,
-  HiChartBar,
-  HiShieldCheck,
-  HiExclamationCircle,
-  HiCheckCircle,
-  HiClock,
-  HiLocationMarker,
-  HiRefresh,
-  HiBell,
-  HiCog,
-  HiDocumentReport,
-  HiSpeakerphone
+  HiRefresh
 } from 'react-icons/hi';
-import { FaDroplet, FaHospital, FaHeartPulse, FaUserDoctor, FaUsers } from 'react-icons/fa6';
-import { Line, Bar, Doughnut, Pie } from 'react-chartjs-2';
+import { FaDroplet, FaHospital, FaHeartPulse } from 'react-icons/fa6';
+import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -34,123 +19,150 @@ import {
   Legend,
   ArcElement
 } from 'chart.js';
-import { useAuth } from '../../context/AuthContext';
 import { adminAPI } from '../../services/api';
-import toast from 'react-hot-toast';
 
-// Register ChartJS
 ChartJS.register(
-  CategoryScale, LinearScale, BarElement, PointElement, LineElement,
-  Title, Tooltip, Legend, ArcElement
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement
 );
 
+function dailySeriesMap(rows = []) {
+  const map = new Map(rows.map((row) => [row._id, row.count]));
+  const items = [];
+
+  for (let offset = 6; offset >= 0; offset -= 1) {
+    const current = new Date();
+    current.setDate(current.getDate() - offset);
+    const key = current.toISOString().slice(0, 10);
+    items.push({
+      label: current.toLocaleDateString('en-US', { weekday: 'short' }),
+      count: map.get(key) || 0
+    });
+  }
+
+  return items;
+}
+
+function monthlySeries(rows = [], valueKey) {
+  return rows.map((row) => ({
+    label: `${String(row._id.month).padStart(2, '0')}/${row._id.year}`,
+    value: row[valueKey] || 0
+  }));
+}
+
+const DEFAULT_OVERVIEW = {
+  totalUsers: 0,
+  totalDonors: 0,
+  totalHospitals: 0,
+  totalRequests: 0,
+  pendingRequests: 0,
+  emergencyRequests: 0,
+  totalDonations: 0,
+  verificationsPending: 0
+};
+
 const AdminDashboard = () => {
-  const { user } = useAuth();
-  
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    totalDonors: 0,
-    totalReceivers: 0,
-    totalHospitals: 0,
-    verifiedHospitals: 0,
-    pendingVerifications: 0,
-    activeRequests: 0,
-    totalDonations: 0,
-    livesImpacted: 0
+  const [overview, setOverview] = useState(DEFAULT_OVERVIEW);
+  const [dailyStats, setDailyStats] = useState({
+    registrations: [],
+    requests: [],
+    donations: []
   });
+  const [distributions, setDistributions] = useState({
+    bloodGroups: [],
+    requestStatus: []
+  });
+  const [monthlyTrends, setMonthlyTrends] = useState({
+    requests: [],
+    donations: []
+  });
+  const [topHospitals, setTopHospitals] = useState([]);
   const [recentUsers, setRecentUsers] = useState([]);
   const [pendingHospitals, setPendingHospitals] = useState([]);
-  const [bloodDistribution, setBloodDistribution] = useState([]);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+  const fetchDashboardData = useCallback(async () => {
+    setLoading(true);
 
-  const fetchDashboardData = async () => {
     try {
-      setLoading(true);
-      
-      const dashboardRes = await adminAPI.getDashboard().catch(() => ({ data: {} }));
-      
-      // Set stats with defaults if API fails
-      setStats({
-        totalUsers: dashboardRes.data?.totalUsers || 12580,
-        totalDonors: dashboardRes.data?.totalDonors || 8540,
-        totalReceivers: dashboardRes.data?.totalReceivers || 3500,
-        totalHospitals: dashboardRes.data?.totalHospitals || 456,
-        verifiedHospitals: dashboardRes.data?.verifiedHospitals || 420,
-        pendingVerifications: dashboardRes.data?.pendingVerifications || 12,
-        activeRequests: dashboardRes.data?.activeRequests || 87,
-        totalDonations: dashboardRes.data?.totalDonations || 15420,
-        livesImpacted: (dashboardRes.data?.totalDonations || 15420) * 3
-      });
+      const [dashboardRes, usersRes, hospitalsRes] = await Promise.all([
+        adminAPI.getDashboard().catch(() => ({ data: { dashboard: {} } })),
+        adminAPI.getUsers({ limit: 5 }).catch(() => ({ data: { users: [] } })),
+        adminAPI.getHospitals({ limit: 5, verified: false }).catch(() => ({ data: { hospitals: [] } }))
+      ]);
 
-      setRecentUsers(dashboardRes.data?.recentUsers || []);
-      setPendingHospitals(dashboardRes.data?.pendingHospitals || []);
-      setBloodDistribution(dashboardRes.data?.bloodDistribution || getDefaultBloodDistribution());
+      const dashboard = dashboardRes.data?.dashboard || {};
+
+      setOverview(dashboard.overview || DEFAULT_OVERVIEW);
+      setDailyStats({
+        registrations: dailySeriesMap(dashboard.dailyStats?.registrations),
+        requests: dailySeriesMap(dashboard.dailyStats?.requests),
+        donations: dailySeriesMap(dashboard.dailyStats?.donations)
+      });
+      setDistributions({
+        bloodGroups: dashboard.distributions?.bloodGroups || [],
+        requestStatus: dashboard.distributions?.requestStatus || []
+      });
+      setMonthlyTrends({
+        requests: monthlySeries(dashboard.monthlyTrends?.requests || [], 'requests'),
+        donations: monthlySeries(dashboard.monthlyTrends?.donations || [], 'donations')
+      });
+      setTopHospitals(dashboard.topHospitals || []);
+      setRecentUsers(usersRes.data?.users || []);
+      setPendingHospitals(hospitalsRes.data?.hospitals || []);
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('Error fetching admin dashboard:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const getDefaultBloodDistribution = () => [
-    { type: 'A+', percentage: 28 },
-    { type: 'A-', percentage: 5 },
-    { type: 'B+', percentage: 22 },
-    { type: 'B-', percentage: 4 },
-    { type: 'AB+', percentage: 7 },
-    { type: 'AB-', percentage: 2 },
-    { type: 'O+', percentage: 27 },
-    { type: 'O-', percentage: 5 }
-  ];
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
-  // User Growth Chart
-  const userGrowthData = {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+  const userGrowthData = useMemo(() => ({
+    labels: dailyStats.registrations.map((item) => item.label),
     datasets: [
       {
-        label: 'Donors',
-        data: [800, 1200, 1500, 2100, 2800, 3500, 4200, 5000, 5800, 6800, 7600, 8540],
+        label: 'Registrations',
+        data: dailyStats.registrations.map((item) => item.count),
         borderColor: '#DC2626',
         backgroundColor: 'rgba(220, 38, 38, 0.1)',
         fill: true,
-        tension: 0.4
+        tension: 0.35
       },
       {
-        label: 'Receivers',
-        data: [300, 500, 700, 1000, 1400, 1800, 2200, 2600, 2900, 3100, 3300, 3500],
+        label: 'Requests',
+        data: dailyStats.requests.map((item) => item.count),
         borderColor: '#3B82F6',
         backgroundColor: 'rgba(59, 130, 246, 0.1)',
         fill: true,
-        tension: 0.4
+        tension: 0.35
+      },
+      {
+        label: 'Donations',
+        data: dailyStats.donations.map((item) => item.count),
+        borderColor: '#10B981',
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        fill: true,
+        tension: 0.35
       }
     ]
-  };
+  }), [dailyStats]);
 
-  const userGrowthOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'bottom'
-      }
-    },
-    scales: {
-      y: {
-        beginAtZero: true
-      }
-    }
-  };
-
-  // Blood Type Distribution Chart
-  const bloodTypeData = {
-    labels: bloodDistribution.map(d => d.type),
+  const bloodTypeData = useMemo(() => ({
+    labels: distributions.bloodGroups.map((item) => item._id),
     datasets: [
       {
-        data: bloodDistribution.map(d => d.percentage),
+        data: distributions.bloodGroups.map((item) => item.count),
         backgroundColor: [
           '#DC2626', '#EF4444', '#F87171', '#FCA5A5',
           '#10B981', '#34D399', '#6EE7B7', '#A7F3D0'
@@ -158,69 +170,30 @@ const AdminDashboard = () => {
         borderWidth: 0
       }
     ]
-  };
+  }), [distributions.bloodGroups]);
 
-  const bloodTypeOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'right'
-      }
-    }
-  };
-
-  // Donation Trends
-  const donationTrendData = {
-    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+  const trendData = useMemo(() => ({
+    labels: monthlyTrends.requests.map((item) => item.label),
     datasets: [
       {
-        label: 'Donations',
-        data: [45, 62, 58, 72, 85, 48, 35],
-        backgroundColor: '#DC2626',
+        label: 'Requests',
+        data: monthlyTrends.requests.map((item) => item.value),
+        backgroundColor: '#3B82F6',
         borderRadius: 8
       },
       {
-        label: 'Requests',
-        data: [38, 55, 48, 65, 78, 42, 30],
-        backgroundColor: '#3B82F6',
+        label: 'Donations',
+        data: monthlyTrends.donations.map((item) => item.value),
+        backgroundColor: '#DC2626',
         borderRadius: 8
       }
     ]
-  };
-
-  const donationTrendOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'bottom'
-      }
-    },
-    scales: {
-      y: {
-        beginAtZero: true
-      }
-    }
-  };
-
-  // Regional Stats
-  const regionalData = {
-    labels: ['North', 'South', 'East', 'West', 'Central'],
-    datasets: [
-      {
-        data: [28, 22, 18, 20, 12],
-        backgroundColor: ['#DC2626', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6'],
-        borderWidth: 0
-      }
-    ]
-  };
+  }), [monthlyTrends]);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <HiChartBar className="h-12 w-12 text-primary-600 animate-pulse mx-auto mb-4" />
           <p className="text-gray-600">Loading admin dashboard...</p>
         </div>
       </div>
@@ -229,393 +202,143 @@ const AdminDashboard = () => {
 
   return (
     <div className="p-6 lg:p-8">
-          {/* Header */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-8"
-          >
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
-                  Admin Dashboard 🎛️
-                </h1>
-                <p className="text-gray-600 mt-1">
-                  Monitor and manage the entire platform
-                </p>
-              </div>
-              
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={fetchDashboardData}
-                  className="btn-secondary flex items-center gap-2"
-                >
-                  <HiRefresh className="h-5 w-5" />
-                  Refresh
-                </button>
-                <Link
-                  to="/admin/announcements"
-                  className="btn-primary flex items-center gap-2"
-                >
-                  <HiSpeakerphone className="h-5 w-5" />
-                  Announcement
-                </Link>
-              </div>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+            <p className="text-gray-600 mt-1">Platform overview backed by live admin analytics.</p>
+          </div>
+          <button onClick={fetchDashboardData} className="btn-secondary flex items-center gap-2" type="button">
+            <HiRefresh className="h-5 w-5" />
+            Refresh
+          </button>
+        </div>
+      </motion.div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="stat-card">
+          <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4">
+            <HiUserGroup className="h-6 w-6 text-blue-600" />
+          </div>
+          <p className="text-3xl font-bold text-gray-900"><CountUp end={overview.totalUsers} duration={1.4} /></p>
+          <p className="text-gray-500">Total Users</p>
+        </div>
+
+        <div className="stat-card">
+          <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center mb-4">
+            <FaDroplet className="h-6 w-6 text-red-600" />
+          </div>
+          <p className="text-3xl font-bold text-gray-900"><CountUp end={overview.totalDonors} duration={1.4} /></p>
+          <p className="text-gray-500">Donors</p>
+        </div>
+
+        <div className="stat-card">
+          <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-4">
+            <FaHospital className="h-6 w-6 text-purple-600" />
+          </div>
+          <p className="text-3xl font-bold text-gray-900"><CountUp end={overview.totalHospitals} duration={1.4} /></p>
+          <p className="text-gray-500">Hospitals</p>
+        </div>
+
+        <div className="stat-card">
+          <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-4">
+            <FaHeartPulse className="h-6 w-6 text-green-600" />
+          </div>
+          <p className="text-3xl font-bold text-gray-900"><CountUp end={overview.totalDonations} duration={1.4} /></p>
+          <p className="text-gray-500">Completed Donations</p>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-6 mb-8">
+        <div className="lg:col-span-2 card p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-6">Last 7 Days</h2>
+          <div className="h-64">
+            <Line data={userGrowthData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }} />
+          </div>
+        </div>
+
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-6">Blood Group Distribution</h2>
+          <div className="h-64">
+            <Doughnut data={bloodTypeData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }} />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-6 mb-8">
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-6">Monthly Requests vs Donations</h2>
+          <div className="h-64">
+            <Bar data={trendData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }} />
+          </div>
+        </div>
+
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-6">Platform Health</h2>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50">
+              <span className="text-gray-600">Total Requests</span>
+              <span className="font-semibold text-gray-900">{overview.totalRequests}</span>
             </div>
-          </motion.div>
-
-          {/* Alert Banner */}
-          {stats.pendingVerifications > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-6 bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center gap-4"
-            >
-              <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
-                <HiExclamationCircle className="h-6 w-6 text-yellow-600" />
-              </div>
-              <div className="flex-1">
-                <p className="font-medium text-yellow-800">Pending Verifications</p>
-                <p className="text-sm text-yellow-700">
-                  {stats.pendingVerifications} hospital(s) awaiting verification.
-                </p>
-              </div>
-              <Link to="/admin/verifications" className="btn-warning btn-sm">
-                Review Now
-              </Link>
-            </motion.div>
-          )}
-
-          {/* Main Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="stat-card"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                  <FaUsers className="h-5 w-5 text-blue-600" />
-                </div>
-                <span className="text-green-600 text-xs font-medium flex items-center">
-                  <HiTrendingUp className="h-3 w-3 mr-0.5" />
-                  12%
-                </span>
-              </div>
-              <p className="text-2xl font-bold text-gray-900">
-                <CountUp end={stats.totalUsers} duration={2} separator="," />
-              </p>
-              <p className="text-xs text-gray-500">Total Users</p>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 }}
-              className="stat-card"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
-                  <FaDroplet className="h-5 w-5 text-primary-600" />
-                </div>
-                <span className="text-green-600 text-xs font-medium flex items-center">
-                  <HiTrendingUp className="h-3 w-3 mr-0.5" />
-                  8%
-                </span>
-              </div>
-              <p className="text-2xl font-bold text-gray-900">
-                <CountUp end={stats.totalDonors} duration={2} separator="," />
-              </p>
-              <p className="text-xs text-gray-500">Donors</p>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="stat-card"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
-                  <FaUserDoctor className="h-5 w-5 text-purple-600" />
-                </div>
-              </div>
-              <p className="text-2xl font-bold text-gray-900">
-                <CountUp end={stats.totalReceivers} duration={2} separator="," />
-              </p>
-              <p className="text-xs text-gray-500">Receivers</p>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.25 }}
-              className="stat-card"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
-                  <HiOfficeBuilding className="h-5 w-5 text-green-600" />
-                </div>
-                <span className="badge badge-success text-xs">
-                  {stats.verifiedHospitals} verified
-                </span>
-              </div>
-              <p className="text-2xl font-bold text-gray-900">
-                <CountUp end={stats.totalHospitals} duration={2} />
-              </p>
-              <p className="text-xs text-gray-500">Hospitals</p>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="stat-card"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
-                  <FaHeartPulse className="h-5 w-5 text-red-600" />
-                </div>
-              </div>
-              <p className="text-2xl font-bold text-gray-900">
-                <CountUp end={stats.totalDonations} duration={2} separator="," />
-              </p>
-              <p className="text-xs text-gray-500">Total Donations</p>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 }}
-              className="stat-card bg-gradient-to-br from-primary-500 to-primary-700 text-white"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                  <HiCheckCircle className="h-5 w-5 text-white" />
-                </div>
-              </div>
-              <p className="text-2xl font-bold">
-                <CountUp end={stats.livesImpacted} duration={2} separator="," />
-              </p>
-              <p className="text-xs text-primary-100">Lives Impacted</p>
-            </motion.div>
+            <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50">
+              <span className="text-gray-600">Pending Requests</span>
+              <span className="font-semibold text-gray-900">{overview.pendingRequests}</span>
+            </div>
+            <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50">
+              <span className="text-gray-600">Emergency Requests</span>
+              <span className="font-semibold text-gray-900">{overview.emergencyRequests}</span>
+            </div>
+            <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50">
+              <span className="text-gray-600">Pending Verifications</span>
+              <span className="font-semibold text-gray-900">{overview.verificationsPending}</span>
+            </div>
           </div>
+        </div>
+      </div>
 
-          {/* Charts Row */}
-          <div className="grid lg:grid-cols-2 gap-6 mb-8">
-            {/* User Growth Chart */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="card p-6"
-            >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-semibold text-gray-900">User Growth</h2>
-                <select className="input input-sm w-auto">
-                  <option>This Year</option>
-                  <option>Last Year</option>
-                </select>
+      <div className="grid lg:grid-cols-3 gap-6">
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-6">Recent Users</h2>
+          <div className="space-y-3">
+            {recentUsers.length === 0 ? (
+              <p className="text-sm text-gray-500">No users found.</p>
+            ) : recentUsers.map((user) => (
+              <div key={user._id} className="p-3 rounded-lg bg-gray-50">
+                <p className="font-medium text-gray-900">{user.firstName} {user.lastName}</p>
+                <p className="text-sm text-gray-500">{user.email}</p>
               </div>
-              <div className="h-72">
-                <Line data={userGrowthData} options={userGrowthOptions} />
-              </div>
-            </motion.div>
-
-            {/* Donation Trends */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-              className="card p-6"
-            >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-semibold text-gray-900">Weekly Activity</h2>
-                <Link to="/admin/analytics" className="text-primary-600 text-sm font-medium hover:underline">
-                  View Details
-                </Link>
-              </div>
-              <div className="h-72">
-                <Bar data={donationTrendData} options={donationTrendOptions} />
-              </div>
-            </motion.div>
+            ))}
           </div>
+        </div>
 
-          {/* Middle Row */}
-          <div className="grid lg:grid-cols-3 gap-6 mb-8">
-            {/* Blood Type Distribution */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-              className="card p-6"
-            >
-              <h2 className="text-lg font-semibold text-gray-900 mb-6">Blood Type Distribution</h2>
-              <div className="h-64">
-                <Pie data={bloodTypeData} options={bloodTypeOptions} />
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-6">Pending Hospitals</h2>
+          <div className="space-y-3">
+            {pendingHospitals.length === 0 ? (
+              <p className="text-sm text-gray-500">No pending hospitals.</p>
+            ) : pendingHospitals.map((hospital) => (
+              <div key={hospital._id} className="p-3 rounded-lg bg-gray-50">
+                <p className="font-medium text-gray-900">{hospital.name}</p>
+                <p className="text-sm text-gray-500">{hospital.address?.city || 'Unknown city'}</p>
               </div>
-            </motion.div>
-
-            {/* Regional Stats */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.7 }}
-              className="card p-6"
-            >
-              <h2 className="text-lg font-semibold text-gray-900 mb-6">Regional Distribution</h2>
-              <div className="h-64">
-                <Doughnut data={regionalData} options={{ responsive: true, maintainAspectRatio: false, cutout: '60%' }} />
-              </div>
-            </motion.div>
-
-            {/* System Health */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.8 }}
-              className="card p-6"
-            >
-              <h2 className="text-lg font-semibold text-gray-900 mb-6">System Health</h2>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                      <HiCheckCircle className="h-4 w-4 text-green-600" />
-                    </div>
-                    <span className="font-medium text-gray-900">API Services</span>
-                  </div>
-                  <span className="badge badge-success">Online</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                      <HiCheckCircle className="h-4 w-4 text-green-600" />
-                    </div>
-                    <span className="font-medium text-gray-900">Database</span>
-                  </div>
-                  <span className="badge badge-success">Healthy</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                      <HiCheckCircle className="h-4 w-4 text-green-600" />
-                    </div>
-                    <span className="font-medium text-gray-900">Socket Server</span>
-                  </div>
-                  <span className="badge badge-success">Connected</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
-                      <HiExclamationCircle className="h-4 w-4 text-yellow-600" />
-                    </div>
-                    <span className="font-medium text-gray-900">Email Service</span>
-                  </div>
-                  <span className="badge badge-warning">High Load</span>
-                </div>
-              </div>
-            </motion.div>
+            ))}
           </div>
+        </div>
 
-          {/* Bottom Row - Quick Actions & Recent Activity */}
-          <div className="grid lg:grid-cols-2 gap-6">
-            {/* Pending Verifications */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.9 }}
-              className="card p-6"
-            >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-semibold text-gray-900">Pending Hospital Verifications</h2>
-                <Link to="/admin/verifications" className="text-primary-600 text-sm font-medium hover:underline">
-                  View All
-                </Link>
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-6">Top Hospitals</h2>
+          <div className="space-y-3">
+            {topHospitals.length === 0 ? (
+              <p className="text-sm text-gray-500">No donation leaders yet.</p>
+            ) : topHospitals.map((hospital) => (
+              <div key={hospital._id || hospital.name} className="p-3 rounded-lg bg-gray-50">
+                <p className="font-medium text-gray-900">{hospital.name}</p>
+                <p className="text-sm text-gray-500">{hospital.count} completed donations</p>
               </div>
-              
-              {pendingHospitals.length === 0 ? (
-                <div className="text-center py-8">
-                  <HiShieldCheck className="h-12 w-12 text-green-300 mx-auto mb-3" />
-                  <p className="text-gray-500">All hospitals are verified!</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {[1, 2, 3].map((_, index) => (
-                    <div key={index} className="p-4 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                            <FaHospital className="h-5 w-5 text-blue-600" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900">City General Hospital</p>
-                            <p className="text-sm text-gray-500">Applied 2 days ago</p>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <button className="btn-success btn-sm">Approve</button>
-                          <button className="btn-danger btn-sm">Reject</button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </motion.div>
-
-            {/* Quick Admin Actions */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1 }}
-              className="card p-6"
-            >
-              <h2 className="text-lg font-semibold text-gray-900 mb-6">Quick Actions</h2>
-              <div className="grid grid-cols-2 gap-4">
-                <Link
-                  to="/admin/users"
-                  className="p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors text-center group"
-                >
-                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
-                    <HiUserGroup className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <p className="font-medium text-gray-900">Manage Users</p>
-                </Link>
-                
-                <Link
-                  to="/admin/hospitals"
-                  className="p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors text-center group"
-                >
-                  <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
-                    <HiOfficeBuilding className="h-6 w-6 text-green-600" />
-                  </div>
-                  <p className="font-medium text-gray-900">Hospitals</p>
-                </Link>
-                
-                <Link
-                  to="/admin/analytics"
-                  className="p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors text-center group"
-                >
-                  <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
-                    <HiChartBar className="h-6 w-6 text-purple-600" />
-                  </div>
-                  <p className="font-medium text-gray-900">Analytics</p>
-                </Link>
-                
-                <Link
-                  to="/admin/settings"
-                  className="p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors text-center group"
-                >
-                  <div className="w-12 h-12 bg-gray-200 rounded-xl flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
-                    <HiCog className="h-6 w-6 text-gray-600" />
-                  </div>
-                  <p className="font-medium text-gray-900">Settings</p>
-                </Link>
-              </div>
-            </motion.div>
+            ))}
           </div>
+        </div>
+      </div>
     </div>
   );
 };

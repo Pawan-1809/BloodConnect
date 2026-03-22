@@ -5,6 +5,7 @@ const { User, DonorProfile } = require('../models');
 const { protect } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { registerValidation, loginValidation } = require('../middleware/validators');
+const { syncDonorProfileStats } = require('../services/donorStatsService');
 
 const router = express.Router();
 
@@ -150,7 +151,8 @@ router.get('/me', protect, asyncHandler(async (req, res) => {
   // Get donor profile if donor
   let donorProfile = null;
   if (user.role === 'donor') {
-    donorProfile = await DonorProfile.findOne({ user: user._id });
+    const donorSnapshot = await syncDonorProfileStats(user._id);
+    donorProfile = donorSnapshot?.donorProfile || null;
   }
 
   res.json({

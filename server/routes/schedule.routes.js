@@ -105,20 +105,25 @@ router.get('/', paginationValidation, asyncHandler(async (req, res) => {
     page = 1,
     limit = 20,
     type,
-    upcoming = true,
+    upcoming = 'true',
     city,
+    hospital,
     lat,
     lng,
     radius = 50
   } = req.query;
 
-  let query = { status: { $in: ['published', 'ongoing'] } };
+  let query = {
+    status: { $in: ['published', 'ongoing'] },
+    isPublic: true
+  };
 
   if (type) query.type = type;
-  if (upcoming === 'true') {
+  if (upcoming === 'true' || upcoming === true) {
     query.date = { $gte: new Date() };
   }
   if (city) query['venue.city'] = new RegExp(city, 'i');
+  if (hospital) query.hospital = hospital;
 
   let schedules;
 

@@ -4,6 +4,7 @@ const { protect, authorize } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { donorProfileValidation, donorSearchValidation, paginationValidation } = require('../middleware/validators');
 const { CAN_RECEIVE_FROM, BLOOD_GROUPS } = require('../config/constants');
+const { syncDonorProfileStats } = require('../services/donorStatsService');
 
 const router = express.Router();
 
@@ -70,8 +71,8 @@ router.post('/profile', protect, authorize('donor'), donorProfileValidation, asy
 // @desc    Get my donor profile
 // @access  Private (Donor)
 router.get('/profile', protect, authorize('donor'), asyncHandler(async (req, res) => {
-  const donorProfile = await DonorProfile.findOne({ user: req.user.id })
-    .populate('user', 'firstName lastName email phone avatar address location');
+  const donorSnapshot = await syncDonorProfileStats(req.user.id);
+  const donorProfile = donorSnapshot?.donorProfile;
 
   if (!donorProfile) {
     return res.status(404).json({
@@ -266,6 +267,7 @@ router.put('/availability', protect, authorize('donor'), asyncHandler(async (req
 // @access  Private (Donor)
 router.get('/history', protect, authorize('donor'), asyncHandler(async (req, res) => {
   const { page = 1, limit = 10 } = req.query;
+  const donorSnapshot = await syncDonorProfileStats(req.user.id);
 
   const donations = await Donation.find({ donor: req.user.id })
     .populate('hospital', 'name address')
@@ -275,16 +277,15 @@ router.get('/history', protect, authorize('donor'), asyncHandler(async (req, res
 
   const total = await Donation.countDocuments({ donor: req.user.id });
 
-  const donorProfile = await DonorProfile.findOne({ user: req.user.id });
-
   res.json({
     success: true,
     count: donations.length,
     total,
     page: parseInt(page),
     pages: Math.ceil(total / limit),
-    totalDonations: donorProfile?.totalDonations || 0,
-    totalLivesSaved: donorProfile?.totalLivesSaved || 0,
+    totalDonations: donorSnapshot?.stats?.totalDonations || 0,
+    totalLivesSaved: donorSnapshot?.stats?.totalLivesSaved || 0,
+    totalPoints: donorSnapshot?.stats?.points || 0,
     donations
   });
 }));
@@ -293,7 +294,8 @@ router.get('/history', protect, authorize('donor'), asyncHandler(async (req, res
 // @desc    Get donor statistics
 // @access  Private (Donor)
 router.get('/stats', protect, authorize('donor'), asyncHandler(async (req, res) => {
-  const donorProfile = await DonorProfile.findOne({ user: req.user.id });
+  const donorSnapshot = await syncDonorProfileStats(req.user.id);
+  const donorProfile = donorSnapshot?.donorProfile;
 
   if (!donorProfile) {
     return res.status(404).json({
@@ -302,43 +304,9 @@ router.get('/stats', protect, authorize('donor'), asyncHandler(async (req, res) 
     });
   }
 
-  // Get donation stats by month
-  const monthlyDonations = await Donation.aggregate([
-    { $match: { donor: req.user._id, status: 'completed' } },
-    {
-      $group: {
-        _id: {
-          year: { $year: '$donationDate' },
-          month: { $month: '$donationDate' }
-        },
-        count: { $sum: 1 }
-      }
-    },
-    { $sort: { '_id.year': -1, '_id.month': -1 } },
-    { $limit: 12 }
-  ]);
-
-  // Get upcoming donation eligibility
-  const daysUntilEligible = donorProfile.nextEligibleDate
-    ? Math.max(0, Math.ceil((donorProfile.nextEligibleDate - new Date()) / (1000 * 60 * 60 * 24)))
-    : 0;
-
   res.json({
     success: true,
-    stats: {
-      bloodGroup: donorProfile.bloodGroup,
-      totalDonations: donorProfile.totalDonations,
-      totalLivesSaved: donorProfile.totalLivesSaved,
-      points: donorProfile.points,
-      rank: donorProfile.donorRank,
-      badges: donorProfile.badges,
-      isAvailable: donorProfile.isAvailable,
-      lastDonationDate: donorProfile.lastDonationDate,
-      nextEligibleDate: donorProfile.nextEligibleDate,
-      daysUntilEligible,
-      isEligible: daysUntilEligible === 0,
-      monthlyDonations
-    }
+    stats: donorSnapshot.stats
   });
 }));
 
@@ -346,8 +314,8 @@ router.get('/stats', protect, authorize('donor'), asyncHandler(async (req, res) 
 // @desc    Check donor eligibility for next donation
 // @access  Private (Donor)
 router.get('/check-eligibility', protect, authorize('donor'), asyncHandler(async (req, res) => {
-  const donorProfile = await DonorProfile.findOne({ user: req.user.id })
-    .select('lastDonationDate nextEligibleDate healthDeclaration isAvailable bloodGroup');
+  const donorSnapshot = await syncDonorProfileStats(req.user.id);
+  const donorProfile = donorSnapshot?.donorProfile;
 
   if (!donorProfile) {
     return res.status(404).json({
@@ -356,21 +324,12 @@ router.get('/check-eligibility', protect, authorize('donor'), asyncHandler(async
     });
   }
 
-  const nextEligibleDate = donorProfile.nextEligibleDate
-    ? new Date(donorProfile.nextEligibleDate)
-    : donorProfile.lastDonationDate
-      ? new Date(new Date(donorProfile.lastDonationDate).getTime() + 56 * 24 * 60 * 60 * 1000)
-      : null;
-  const daysUntilEligible = nextEligibleDate
-    ? Math.max(0, Math.ceil((nextEligibleDate - new Date()) / (1000 * 60 * 60 * 24)))
-    : 0;
-
   res.json({
     success: true,
     eligibility: {
-      isEligible: daysUntilEligible === 0,
-      daysUntilEligible,
-      nextEligibleDate,
+      isEligible: donorSnapshot.stats.isEligible,
+      daysUntilEligible: donorSnapshot.stats.daysUntilEligible,
+      nextEligibleDate: donorSnapshot.stats.nextEligibleDate,
       bloodGroup: donorProfile.bloodGroup,
       isAvailable: donorProfile.isAvailable
     }

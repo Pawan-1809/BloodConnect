@@ -15,7 +15,6 @@ import {
   HiSearch,
   HiPlus,
   HiHeart,
-  HiLocationMarker,
   HiCalendar,
   HiClipboardList,
   HiUserGroup,
@@ -98,6 +97,21 @@ const Navbar = () => {
   };
 
   const navItems = getNavItems();
+  const getProfilePath = () => {
+    if (!user) return '/settings';
+    switch (user.role) {
+      case 'donor':
+        return '/donor/profile';
+      case 'hospital':
+        return '/hospital/profile';
+      case 'receiver':
+        return '/receiver/profile';
+      case 'admin':
+        return '/admin/profile';
+      default:
+        return '/settings';
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -248,7 +262,7 @@ const Navbar = () => {
                         </div>
                         <div className="py-2">
                           <Link
-                            to={`/${user.role}/profile`}
+                            to={getProfilePath()}
                             className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                             onClick={() => setIsProfileOpen(false)}
                           >

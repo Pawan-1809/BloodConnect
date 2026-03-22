@@ -399,7 +399,8 @@ router.get('/donations', protect, authorize('hospital'), paginationValidation, a
 // @desc    Get hospital by ID
 // @access  Public
 router.get('/:id', asyncHandler(async (req, res) => {
-  const hospital = await Hospital.findById(req.params.id);
+  const hospital = await Hospital.findById(req.params.id)
+    .populate('reviews.user', 'firstName lastName');
 
   if (!hospital) {
     return res.status(404).json({

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import CountUp from 'react-countup';
 import { FaDroplet, FaHeart, FaHospital, FaUserGroup, FaHandHoldingHeart, FaClock, FaLocationDot, FaShieldHalved, FaMedal, FaBell } from 'react-icons/fa6';
-import { HiArrowRight, HiCheck, HiStar, HiChevronLeft, HiChevronRight, HiPlay } from 'react-icons/hi';
+import { HiArrowRight, HiCheck, HiStar, HiChevronLeft, HiChevronRight } from 'react-icons/hi';
 import { Navbar, Footer } from '../components/common';
 
 const Landing = () => {

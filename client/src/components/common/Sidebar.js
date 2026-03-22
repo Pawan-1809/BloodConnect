@@ -80,7 +80,7 @@ const Sidebar = ({ isOpen = true, onClose }) => {
             title: 'Discover',
             items: [
               { name: 'Nearby Hospitals', path: '/hospitals', icon: HiLocationMarker },
-              { name: 'Blood Banks', path: '/blood-banks', icon: HiCollection }
+              { name: 'Blood Banks', path: '/hospitals?type=blood_bank', icon: HiCollection }
             ]
           }
         ];
@@ -155,7 +155,12 @@ const Sidebar = ({ isOpen = true, onClose }) => {
 
   const sidebarItems = getSidebarItems();
 
-  const isActive = (path) => location.pathname === path;
+  const isActive = (path) => {
+    const [pathname, query] = path.split('?');
+    if (location.pathname !== pathname) return false;
+    if (!query) return true;
+    return location.search === `?${query}`;
+  };
 
   return (
     <>
