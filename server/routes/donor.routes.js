@@ -342,6 +342,41 @@ router.get('/stats', protect, authorize('donor'), asyncHandler(async (req, res) 
   });
 }));
 
+// @route   GET /api/donors/check-eligibility
+// @desc    Check donor eligibility for next donation
+// @access  Private (Donor)
+router.get('/check-eligibility', protect, authorize('donor'), asyncHandler(async (req, res) => {
+  const donorProfile = await DonorProfile.findOne({ user: req.user.id })
+    .select('lastDonationDate nextEligibleDate healthDeclaration isAvailable bloodGroup');
+
+  if (!donorProfile) {
+    return res.status(404).json({
+      success: false,
+      message: 'Donor profile not found'
+    });
+  }
+
+  const nextEligibleDate = donorProfile.nextEligibleDate
+    ? new Date(donorProfile.nextEligibleDate)
+    : donorProfile.lastDonationDate
+      ? new Date(new Date(donorProfile.lastDonationDate).getTime() + 56 * 24 * 60 * 60 * 1000)
+      : null;
+  const daysUntilEligible = nextEligibleDate
+    ? Math.max(0, Math.ceil((nextEligibleDate - new Date()) / (1000 * 60 * 60 * 24)))
+    : 0;
+
+  res.json({
+    success: true,
+    eligibility: {
+      isEligible: daysUntilEligible === 0,
+      daysUntilEligible,
+      nextEligibleDate,
+      bloodGroup: donorProfile.bloodGroup,
+      isAvailable: donorProfile.isAvailable
+    }
+  });
+}));
+
 // @route   GET /api/donors/:id
 // @desc    Get donor by ID (public info)
 // @access  Private

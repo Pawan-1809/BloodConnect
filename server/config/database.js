@@ -2,27 +2,26 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      // Mongoose 8.x doesn't need these options anymore
-      // They're set by default
-    });
+    if (!process.env.MONGODB_URI) {
+      throw new Error('MONGODB_URI is not set');
+    }
 
-    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+    const conn = await mongoose.connect(process.env.MONGODB_URI);
 
-    // Handle connection events
+    console.log(`MongoDB connected: ${conn.connection.host}`);
+
     mongoose.connection.on('error', (err) => {
-      console.error(`❌ MongoDB connection error: ${err}`);
+      console.error(`MongoDB connection error: ${err}`);
     });
 
     mongoose.connection.on('disconnected', () => {
-      console.warn('⚠️ MongoDB disconnected. Attempting to reconnect...');
+      console.warn('MongoDB disconnected. Attempting to reconnect...');
     });
 
     mongoose.connection.on('reconnected', () => {
-      console.log('✅ MongoDB reconnected');
+      console.log('MongoDB reconnected');
     });
 
-    // Graceful shutdown
     process.on('SIGINT', async () => {
       await mongoose.connection.close();
       console.log('MongoDB connection closed through app termination');
@@ -31,7 +30,7 @@ const connectDB = async () => {
 
     return conn;
   } catch (error) {
-    console.error(`❌ Error connecting to MongoDB: ${error.message}`);
+    console.error(`Error connecting to MongoDB: ${error.message}`);
     process.exit(1);
   }
 };

@@ -49,6 +49,7 @@ const HospitalList = lazy(() => import('./pages/shared/HospitalList'));
 const HospitalDetail = lazy(() => import('./pages/shared/HospitalDetail'));
 const Notifications = lazy(() => import('./pages/shared/Notifications'));
 const Settings = lazy(() => import('./pages/shared/Settings'));
+const PublicContentPage = lazy(() => import('./pages/public/PublicContentPage'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 function App() {
@@ -89,6 +90,22 @@ function App() {
         <Route path="/hospitals/:id" element={<Layout><HospitalDetail /></Layout>} />
         <Route path="/schedules" element={<Layout><Schedules /></Layout>} />
         <Route path="/schedules/:id" element={<Layout><ScheduleDetail /></Layout>} />
+        <Route path="/about" element={<Layout showSidebar={false}><PublicContentPage pageKey="about" /></Layout>} />
+        <Route path="/how-it-works" element={<Layout showSidebar={false}><PublicContentPage pageKey="howItWorks" /></Layout>} />
+        <Route path="/leaderboard" element={<Layout showSidebar={false}><PublicContentPage pageKey="leaderboard" /></Layout>} />
+        <Route path="/resources/blood-types" element={<Layout showSidebar={false}><PublicContentPage pageKey="bloodTypes" /></Layout>} />
+        <Route path="/resources/eligibility" element={<Layout showSidebar={false}><PublicContentPage pageKey="eligibility" /></Layout>} />
+        <Route path="/resources/donation-process" element={<Layout showSidebar={false}><PublicContentPage pageKey="donationProcess" /></Layout>} />
+        <Route path="/faqs" element={<Layout showSidebar={false}><PublicContentPage pageKey="faqs" /></Layout>} />
+        <Route path="/blog" element={<Layout showSidebar={false}><PublicContentPage pageKey="blog" /></Layout>} />
+        <Route path="/privacy" element={<Layout showSidebar={false}><PublicContentPage pageKey="privacy" /></Layout>} />
+        <Route path="/terms" element={<Layout showSidebar={false}><PublicContentPage pageKey="terms" /></Layout>} />
+        <Route path="/cookies" element={<Layout showSidebar={false}><PublicContentPage pageKey="cookies" /></Layout>} />
+        <Route path="/data-protection" element={<Layout showSidebar={false}><PublicContentPage pageKey="dataProtection" /></Layout>} />
+        <Route path="/help" element={<Layout showSidebar={false}><PublicContentPage pageKey="help" /></Layout>} />
+        <Route path="/contact" element={<Layout showSidebar={false}><PublicContentPage pageKey="contact" /></Layout>} />
+        <Route path="/report" element={<Layout showSidebar={false}><PublicContentPage pageKey="report" /></Layout>} />
+        <Route path="/partners" element={<Layout showSidebar={false}><PublicContentPage pageKey="partners" /></Layout>} />
 
         {/* Protected - Donor Routes */}
         <Route element={<ProtectedRoute allowedRoles={['donor']} />}>

@@ -18,6 +18,8 @@ services:
         value: 7d
       - key: CLIENT_URL
         sync: false
+      - key: CLIENT_URLS
+        sync: false
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT

@@ -73,24 +73,26 @@ const DonorDashboard = () => {
       // Fetch donor stats
       if (user?._id) {
         const [statsRes, historyRes, requestsRes, appointmentsRes, eligibilityRes] = await Promise.all([
-          donorAPI.getDonorStats(user._id).catch(() => ({ data: {} })),
-          donorAPI.getDonationHistory(user._id).catch(() => ({ data: { donations: [] } })),
+          donorAPI.getDonorStats().catch(() => ({ data: {} })),
+          donorAPI.getDonationHistory().catch(() => ({ data: { donations: [] } })),
           requestAPI.getMatched({ limit: 5 }).catch(() => ({ data: { requests: [] } })),
           scheduleAPI.getMyAppointments({ status: 'upcoming', limit: 3 }).catch(() => ({ data: { appointments: [] } })),
           donorAPI.checkEligibility().catch(() => ({ data: null }))
         ]);
 
+        const donorStats = statsRes.data?.stats || {};
+
         setStats({
-          totalDonations: statsRes.data?.totalDonations || donorProfile?.totalDonations || 0,
-          livesImpacted: (statsRes.data?.totalDonations || donorProfile?.totalDonations || 0) * 3,
-          points: statsRes.data?.points || donorProfile?.points || 0,
-          rank: statsRes.data?.rank || 0
+          totalDonations: donorStats.totalDonations || donorProfile?.totalDonations || 0,
+          livesImpacted: donorStats.totalLivesSaved || (donorProfile?.totalDonations || 0) * 3,
+          points: donorStats.points || donorProfile?.points || 0,
+          rank: donorStats.rank || 0
         });
 
         setRecentDonations(historyRes.data?.donations || []);
         setNearbyRequests(requestsRes.data?.requests || []);
         setUpcomingAppointments(appointmentsRes.data?.appointments || []);
-        setEligibilityStatus(eligibilityRes.data);
+        setEligibilityStatus(eligibilityRes.data?.eligibility || null);
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);

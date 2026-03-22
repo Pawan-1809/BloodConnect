@@ -322,6 +322,79 @@ router.get('/stock/overview', protect, authorize('hospital'), asyncHandler(async
   });
 }));
 
+// @route   GET /api/hospitals/requests
+// @desc    Get requests assigned to my hospital
+// @access  Private (Hospital)
+router.get('/requests', protect, authorize('hospital'), paginationValidation, asyncHandler(async (req, res) => {
+  const { page = 1, limit = 10, status, urgency } = req.query;
+
+  const hospital = await Hospital.findOne({ user: req.user.id }).select('_id');
+
+  if (!hospital) {
+    return res.status(404).json({
+      success: false,
+      message: 'Hospital not found'
+    });
+  }
+
+  const query = { hospital: hospital._id };
+  if (status) query.status = status;
+  if (urgency) query.urgency = urgency;
+
+  const requests = await BloodRequest.find(query)
+    .populate('requester', 'firstName lastName phone')
+    .sort({ createdAt: -1 })
+    .skip((page - 1) * limit)
+    .limit(parseInt(limit, 10));
+
+  const total = await BloodRequest.countDocuments(query);
+
+  res.json({
+    success: true,
+    count: requests.length,
+    total,
+    page: parseInt(page, 10),
+    pages: Math.ceil(total / limit),
+    requests
+  });
+}));
+
+// @route   GET /api/hospitals/donations
+// @desc    Get donations recorded for my hospital
+// @access  Private (Hospital)
+router.get('/donations', protect, authorize('hospital'), paginationValidation, asyncHandler(async (req, res) => {
+  const { page = 1, limit = 10, status } = req.query;
+
+  const hospital = await Hospital.findOne({ user: req.user.id }).select('_id');
+
+  if (!hospital) {
+    return res.status(404).json({
+      success: false,
+      message: 'Hospital not found'
+    });
+  }
+
+  const query = { hospital: hospital._id };
+  if (status) query.status = status;
+
+  const donations = await Donation.find(query)
+    .populate('donor', 'firstName lastName phone')
+    .sort({ donationDate: -1 })
+    .skip((page - 1) * limit)
+    .limit(parseInt(limit, 10));
+
+  const total = await Donation.countDocuments(query);
+
+  res.json({
+    success: true,
+    count: donations.length,
+    total,
+    page: parseInt(page, 10),
+    pages: Math.ceil(total / limit),
+    donations
+  });
+}));
+
 // @route   GET /api/hospitals/:id
 // @desc    Get hospital by ID
 // @access  Public

@@ -64,17 +64,17 @@ const Footer = () => {
             
             {/* Contact Info */}
             <div className="space-y-3">
-              <a href="mailto:contact@bloodconnect.com" className="flex items-center text-gray-400 hover:text-white transition-colors">
+              <a href="mailto:pawankr16123114@gmail.com" className="flex items-center text-gray-400 hover:text-white transition-colors">
                 <HiMail className="h-5 w-5 mr-3 text-primary-500" />
-                contact@bloodconnect.com
+                pawankr16123114@gmail.com
               </a>
-              <a href="tel:+1234567890" className="flex items-center text-gray-400 hover:text-white transition-colors">
+              <a href="tel:+917857917511" className="flex items-center text-gray-400 hover:text-white transition-colors">
                 <HiPhone className="h-5 w-5 mr-3 text-primary-500" />
-                +1 (234) 567-890
+                +91 78579 17511
               </a>
               <p className="flex items-center text-gray-400">
                 <HiLocationMarker className="h-5 w-5 mr-3 text-primary-500" />
-                123 Health Street, Medical City
+                390 RR Plot, Nirvana Cooperative Society, Anandapur, Kolkata
               </p>
             </div>
 

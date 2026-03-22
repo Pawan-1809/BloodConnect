@@ -1,13 +1,14 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const { User } = require('../models');
+const { getAllowedOrigins } = require('../config/origins');
 
 let io;
 
 const initializeSocket = (server) => {
   io = new Server(server, {
     cors: {
-      origin: process.env.CLIENT_URL || 'http://localhost:3000',
+      origin: getAllowedOrigins(),
       methods: ['GET', 'POST'],
       credentials: true
     },
@@ -15,7 +16,6 @@ const initializeSocket = (server) => {
     pingInterval: 25000
   });
 
-  // Authentication middleware
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth.token || socket.handshake.query.token;
@@ -42,22 +42,16 @@ const initializeSocket = (server) => {
     }
   });
 
-  // Connection handler
   io.on('connection', (socket) => {
-    console.log(`✅ User connected: ${socket.user.email} (${socket.user.role})`);
+    console.log(`User connected: ${socket.user.email} (${socket.user.role})`);
 
-    // Join personal room for private notifications
     socket.join(socket.user._id.toString());
-
-    // Join role-based room
     socket.join(`role_${socket.user.role}`);
 
-    // Join city-based room if available
     if (socket.user.address?.city) {
       socket.join(`city_${socket.user.address.city.toLowerCase()}`);
     }
 
-    // Handle real-time location update
     socket.on('update_location', async (data) => {
       try {
         const { latitude, longitude } = data;
@@ -74,7 +68,6 @@ const initializeSocket = (server) => {
       }
     });
 
-    // Handle typing indicator for chat
     socket.on('typing', (data) => {
       socket.to(data.roomId).emit('user_typing', {
         userId: socket.user._id,
@@ -82,35 +75,32 @@ const initializeSocket = (server) => {
       });
     });
 
-    // Handle joining a specific room (for request discussions)
     socket.on('join_room', (roomId) => {
       socket.join(roomId);
       console.log(`User ${socket.user.email} joined room: ${roomId}`);
     });
 
-    // Handle leaving a room
     socket.on('leave_room', (roomId) => {
       socket.leave(roomId);
       console.log(`User ${socket.user.email} left room: ${roomId}`);
     });
 
-    // Handle donor availability change
     socket.on('availability_change', (data) => {
-      // Broadcast to hospitals and receivers in the same city
       if (socket.user.address?.city) {
-        io.to(`city_${socket.user.address.city.toLowerCase()}`).emit('donor_availability_update', {
-          donorId: socket.user._id,
-          bloodGroup: data.bloodGroup,
-          isAvailable: data.isAvailable
-        });
+        io.to(`city_${socket.user.address.city.toLowerCase()}`).emit(
+          'donor_availability_update',
+          {
+            donorId: socket.user._id,
+            bloodGroup: data.bloodGroup,
+            isAvailable: data.isAvailable
+          }
+        );
       }
     });
 
-    // Handle emergency request broadcast
     socket.on('emergency_broadcast', async (data) => {
-      const { requestId, bloodGroup, city, radius } = data;
+      const { requestId, bloodGroup, city } = data;
 
-      // Emit to role_donor room and city room
       io.to('role_donor').emit('emergency_alert', {
         requestId,
         bloodGroup,
@@ -119,7 +109,6 @@ const initializeSocket = (server) => {
       });
     });
 
-    // Handle request status subscription
     socket.on('subscribe_request', (requestId) => {
       socket.join(`request_${requestId}`);
     });
@@ -128,19 +117,16 @@ const initializeSocket = (server) => {
       socket.leave(`request_${requestId}`);
     });
 
-    // Handle stock update subscription (for hospitals)
     socket.on('subscribe_stock_updates', () => {
       if (socket.user.role === 'hospital' || socket.user.role === 'admin') {
         socket.join('stock_updates');
       }
     });
 
-    // Handle disconnect
     socket.on('disconnect', (reason) => {
-      console.log(`❌ User disconnected: ${socket.user.email} (${reason})`);
+      console.log(`User disconnected: ${socket.user.email} (${reason})`);
     });
 
-    // Handle errors
     socket.on('error', (error) => {
       console.error(`Socket error for ${socket.user.email}:`, error);
     });
@@ -149,7 +135,6 @@ const initializeSocket = (server) => {
   return io;
 };
 
-// Get Socket.io instance
 const getIO = () => {
   if (!io) {
     throw new Error('Socket.io not initialized');
@@ -157,35 +142,30 @@ const getIO = () => {
   return io;
 };
 
-// Emit to specific user
 const emitToUser = (userId, event, data) => {
   if (io) {
     io.to(userId.toString()).emit(event, data);
   }
 };
 
-// Emit to role
 const emitToRole = (role, event, data) => {
   if (io) {
     io.to(`role_${role}`).emit(event, data);
   }
 };
 
-// Emit to city
 const emitToCity = (city, event, data) => {
   if (io) {
     io.to(`city_${city.toLowerCase()}`).emit(event, data);
   }
 };
 
-// Broadcast to all
 const broadcast = (event, data) => {
   if (io) {
     io.emit(event, data);
   }
 };
 
-// Emit to request subscribers
 const emitToRequest = (requestId, event, data) => {
   if (io) {
     io.to(`request_${requestId}`).emit(event, data);

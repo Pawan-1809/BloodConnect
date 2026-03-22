@@ -38,8 +38,10 @@ Set local values:
   - `MONGODB_URI=mongodb://localhost:27017/blood_donation_db`
   - `JWT_SECRET=your_local_secret`
   - `CLIENT_URL=http://localhost:3000`
+  - `CLIENT_URLS=http://localhost:3000`
 - `client/.env`:
   - `REACT_APP_API_URL=http://localhost:5000/api`
+  - `REACT_APP_SOCKET_URL=http://localhost:5000`
 
 ### 3. Run app
 
@@ -72,12 +74,15 @@ npm run db:fix-indexes
 
 This repo includes `render.yaml` for Blueprint deploy.
 
+Important: this backend uses MongoDB via Mongoose. Render's free managed datastore options do not include MongoDB, so on the free tier you should keep using an external MongoDB URI such as MongoDB Atlas. The Render service itself can still run on the free web-service plan.
+
 1. Push this repository to GitHub.
 2. In Render: New -> Blueprint -> select this repo.
 3. Render auto-detects `render.yaml` and creates `bloodconnect-api`.
 4. Fill required env vars in Render dashboard:
    - `MONGODB_URI`
-   - `CLIENT_URL` (your Vercel domain)
+   - `CLIENT_URL` (your primary Vercel domain)
+   - `CLIENT_URLS` (comma-separated list if you want production + preview domains)
    - `SMTP_*` and `TWILIO_*` if you use those features.
 5. Deploy and verify:
    - `https://<your-render-service>.onrender.com/api/health`
@@ -93,6 +98,7 @@ This repo includes `client/vercel.json` for SPA routing.
    - Output Directory: `build`
 3. Add env var:
    - `REACT_APP_API_URL=https://<your-render-service>.onrender.com/api`
+   - `REACT_APP_SOCKET_URL=https://<your-render-service>.onrender.com`
 4. Deploy.
 
 ### Frontend on Vercel CLI
@@ -116,10 +122,11 @@ Set production env var and redeploy:
 
 ```bash
 vercel env add REACT_APP_API_URL production
+vercel env add REACT_APP_SOCKET_URL production
 vercel --prod
 ```
 
-Use your Render API URL value (ending in `/api`).
+Use your Render API URL value for `REACT_APP_API_URL` (ending in `/api`) and the base Render URL for `REACT_APP_SOCKET_URL`.
 
 ## GitHub Push Commands
 
@@ -141,3 +148,4 @@ Copy these to actual env files in each environment and fill real secrets.
 - Backend runs in API-only mode if `client/build` is not present on the server.
 - Keep `JWT_SECRET` strong and unique in production.
 - For free hosting reliability, recommended combo is Vercel + Render + MongoDB Atlas.
+- If your frontend uses a Vercel preview URL, include it in `CLIENT_URLS` so API calls and Socket.io are allowed from both origins.
