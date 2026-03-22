@@ -7,6 +7,7 @@ const morgan = require('morgan');
 const compression = require('compression');
 const http = require('http');
 const path = require('path');
+const fs = require('fs');
 
 // Database
 const connectDB = require('./config/database');
@@ -24,6 +25,12 @@ const {
 
 // Middleware
 const { errorHandler, notFound } = require('./middleware/errorHandler');
+const {
+  apiRateLimiter,
+  authRateLimiter,
+  sanitizeRequest,
+  preventHttpParameterPollution
+} = require('./middleware/security');
 
 // Socket & Services
 const { initializeSocket } = require('./socket/socketHandler');
@@ -32,6 +39,9 @@ const { startScheduledJobs } = require('./services/scheduledJobs');
 // Initialize Express
 const app = express();
 const server = http.createServer(app);
+
+// Respect reverse proxy headers in production deployments
+app.set('trust proxy', 1);
 
 // Disable ETag to avoid 304 responses for API endpoints
 app.set('etag', false);
@@ -61,6 +71,8 @@ app.use(cors({
 // Body Parser
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(sanitizeRequest);
+app.use(preventHttpParameterPollution(['sortBy', 'sortOrder', 'fields']));
 
 // Compression
 app.use(compression());
@@ -124,7 +136,9 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-app.use('/api/auth', authRoutes);
+app.use('/api', apiRateLimiter);
+
+app.use('/api/auth', authRateLimiter, authRoutes);
 app.use('/api/donors', donorRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/hospitals', hospitalRoutes);
@@ -203,10 +217,16 @@ app.get('/api', (req, res) => {
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../client/build')));
-  app.get('*', (req, res) => {
-    res.sendFile(path.resolve(__dirname, '../client', 'build', 'index.html'));
-  });
+  const clientBuildPath = path.join(__dirname, '../client/build');
+
+  if (fs.existsSync(clientBuildPath)) {
+    app.use(express.static(clientBuildPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(clientBuildPath, 'index.html'));
+    });
+  } else {
+    console.warn('Client build folder not found. Running API-only mode.');
+  }
 }
 
 // Error handling

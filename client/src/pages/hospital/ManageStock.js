@@ -23,25 +23,48 @@ const ManageStock = () => {
     setLoading(true);
     try {
       const response = await hospitalAPI.getStock();
-      setStock(response.data.data || mockStock);
+      const normalized = (response.data?.stocks || []).map((item) => ({
+        id: item._id,
+        bloodGroup: item.bloodGroup,
+        units: item.availableUnits || 0,
+        minUnits: item.minThreshold || 5,
+        lastUpdated: item.lastStockUpdate || item.updatedAt || new Date().toISOString(),
+        status: item.status || 'adequate'
+      }));
+      setStock(normalized);
     } catch (error) {
       console.error('Error fetching stock:', error);
-      setStock(mockStock);
+      setStock([]);
     }
     setLoading(false);
   };
 
-  // Mock data
-  const mockStock = [
-    { id: 1, bloodGroup: 'A+', units: 45, minUnits: 20, lastUpdated: '2024-08-14T10:30:00', status: 'adequate' },
-    { id: 2, bloodGroup: 'A-', units: 12, minUnits: 15, lastUpdated: '2024-08-14T09:00:00', status: 'low' },
-    { id: 3, bloodGroup: 'B+', units: 38, minUnits: 20, lastUpdated: '2024-08-14T11:00:00', status: 'adequate' },
-    { id: 4, bloodGroup: 'B-', units: 8, minUnits: 10, lastUpdated: '2024-08-13T16:00:00', status: 'critical' },
-    { id: 5, bloodGroup: 'AB+', units: 22, minUnits: 15, lastUpdated: '2024-08-14T08:30:00', status: 'adequate' },
-    { id: 6, bloodGroup: 'AB-', units: 5, minUnits: 10, lastUpdated: '2024-08-12T14:00:00', status: 'critical' },
-    { id: 7, bloodGroup: 'O+', units: 55, minUnits: 30, lastUpdated: '2024-08-14T12:00:00', status: 'adequate' },
-    { id: 8, bloodGroup: 'O-', units: 15, minUnits: 20, lastUpdated: '2024-08-14T07:00:00', status: 'low' },
-  ];
+  const addUnitsToStock = async (bloodGroup, units) => {
+    const unitCount = Number(units || 0);
+    for (let i = 0; i < unitCount; i += 1) {
+      const unique = `${Date.now()}-${bloodGroup}-${i}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+      await hospitalAPI.updateStock({
+        bloodGroup,
+        action: 'add',
+        unitDetails: {
+          unitId: `UNIT-${unique}`,
+          bagNumber: `BAG-${unique}`,
+          expiryDate: new Date(Date.now() + 35 * 24 * 60 * 60 * 1000).toISOString(),
+          status: 'available',
+          testResults: {
+            hiv: 'negative',
+            hepatitisB: 'negative',
+            hepatitisC: 'negative',
+            syphilis: 'negative',
+            malaria: 'negative',
+            overallStatus: 'safe'
+          },
+          testedAt: new Date().toISOString(),
+          testedBy: 'Hospital Staff'
+        }
+      });
+    }
+  };
 
   const getStatusStyle = (status) => {
     switch (status) {
@@ -67,17 +90,20 @@ const ManageStock = () => {
 
   const onAddSubmit = async (data) => {
     try {
-      // await hospitalAPI.addStock(data);
-      const newItem = {
-        id: stock.length + 1,
-        ...data,
-        lastUpdated: new Date().toISOString(),
-        status: data.units >= data.minUnits ? 'adequate' : data.units < data.minUnits / 2 ? 'critical' : 'low'
-      };
-      setStock([...stock, newItem]);
+      await hospitalAPI.updateStock({
+        bloodGroup: data.bloodGroup,
+        action: 'update_threshold',
+        units: {
+          min: Number(data.minUnits),
+          critical: Math.max(1, Math.floor(Number(data.minUnits) / 2))
+        }
+      });
+
+      await addUnitsToStock(data.bloodGroup, data.units);
+      await fetchStock();
       setShowAddModal(false);
       reset();
-      showNotification('success', 'Stock added successfully!');
+      showNotification('success', 'Stock updated successfully from hospital inventory input.');
     } catch (error) {
       showNotification('error', 'Failed to add stock');
     }
@@ -85,21 +111,32 @@ const ManageStock = () => {
 
   const onEditSubmit = async (data) => {
     try {
-      // await hospitalAPI.updateStock(selectedItem.id, data);
-      setStock(stock.map(item => 
-        item.id === selectedItem.id 
-          ? { 
-              ...item, 
-              ...data, 
-              lastUpdated: new Date().toISOString(),
-              status: data.units >= item.minUnits ? 'adequate' : data.units < item.minUnits / 2 ? 'critical' : 'low'
-            } 
-          : item
-      ));
+      const requestedUnits = Number(data.units);
+      const currentUnits = Number(selectedItem.units || 0);
+      const delta = requestedUnits - currentUnits;
+
+      await hospitalAPI.updateStock({
+        bloodGroup: selectedItem.bloodGroup,
+        action: 'update_threshold',
+        units: {
+          min: Number(data.minUnits),
+          critical: Math.max(1, Math.floor(Number(data.minUnits) / 2))
+        }
+      });
+
+      if (delta > 0) {
+        await addUnitsToStock(selectedItem.bloodGroup, delta);
+      }
+
+      if (delta < 0) {
+        showNotification('error', 'Reducing stock units requires issuing/discarding specific units. Threshold updates were saved.');
+      }
+
+      await fetchStock();
       setShowEditModal(false);
       setSelectedItem(null);
       reset();
-      showNotification('success', 'Stock updated successfully!');
+      showNotification('success', 'Stock settings saved successfully!');
     } catch (error) {
       showNotification('error', 'Failed to update stock');
     }
@@ -338,37 +375,33 @@ const ManageStock = () => {
           >
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Recent Stock Changes</h3>
             <div className="space-y-3">
-              {[
-                { type: 'add', blood: 'O+', units: 5, time: '2 hours ago', user: 'Dr. Smith' },
-                { type: 'remove', blood: 'A-', units: 2, time: '4 hours ago', user: 'Blood Bank' },
-                { type: 'add', blood: 'B+', units: 3, time: '6 hours ago', user: 'Dr. Johnson' },
-                { type: 'remove', blood: 'AB+', units: 1, time: '8 hours ago', user: 'Emergency' },
-              ].map((activity, index) => (
+              {stock
+                .slice()
+                .sort((a, b) => new Date(b.lastUpdated) - new Date(a.lastUpdated))
+                .slice(0, 4)
+                .map((activity, index) => (
                 <div key={index} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
                   <div className="flex items-center space-x-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      activity.type === 'add' ? 'bg-green-100' : 'bg-red-100'
-                    }`}>
-                      {activity.type === 'add' ? (
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center bg-green-100">
                         <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                         </svg>
-                      ) : (
-                        <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                        </svg>
-                      )}
                     </div>
                     <div>
                       <p className="font-medium text-gray-800">
-                        {activity.type === 'add' ? 'Added' : 'Removed'} {activity.units} units of {activity.blood}
+                        Last update for {activity.bloodGroup}: {activity.units} available units
                       </p>
-                      <p className="text-sm text-gray-500">By {activity.user}</p>
+                      <p className="text-sm text-gray-500">Updated by hospital account</p>
                     </div>
                   </div>
-                  <span className="text-sm text-gray-400">{activity.time}</span>
+                  <span className="text-sm text-gray-400">
+                    {new Date(activity.lastUpdated).toLocaleString()}
+                  </span>
                 </div>
               ))}
+              {stock.length === 0 && (
+                <p className="text-sm text-gray-500">No stock changes recorded yet.</p>
+              )}
             </div>
           </motion.div>
 

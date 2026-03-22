@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { donationAPI } from '../../services/api';
+import { hospitalAPI } from '../../services/api';
 
 const ManageDonations = () => {
   const [donations, setDonations] = useState([]);
@@ -19,90 +19,32 @@ const ManageDonations = () => {
   const fetchDonations = async () => {
     setLoading(true);
     try {
-      const response = await donationAPI.getAll();
-      setDonations(response.data.data || mockDonations);
+      const response = await hospitalAPI.getDonations();
+      const normalized = (response.data?.donations || []).map((item) => ({
+        id: item._id,
+        donor: {
+          name: item.donor ? `${item.donor.firstName || ''} ${item.donor.lastName || ''}`.trim() : 'Unknown donor',
+          email: item.donor?.email || 'N/A',
+          phone: item.donor?.phone || 'N/A'
+        },
+        bloodGroup: item.bloodGroup,
+        units: 1,
+        type: item.donationType || 'whole_blood',
+        status: item.status,
+        date: item.donationDate,
+        notes: item.notes || '',
+        hemoglobin: item.preScreening?.hemoglobin ?? null,
+        bloodPressure: item.preScreening?.bloodPressure
+          ? `${item.preScreening.bloodPressure.systolic}/${item.preScreening.bloodPressure.diastolic}`
+          : null
+      }));
+      setDonations(normalized);
     } catch (error) {
       console.error('Error fetching donations:', error);
-      setDonations(mockDonations);
+      setDonations([]);
     }
     setLoading(false);
   };
-
-  // Mock data
-  const mockDonations = [
-    {
-      id: 1,
-      donor: { name: 'Michael Johnson', email: 'michael@email.com', phone: '+1 234-567-8901' },
-      bloodGroup: 'O+',
-      units: 1,
-      type: 'whole_blood',
-      status: 'completed',
-      date: '2024-08-14T10:30:00',
-      notes: 'Regular donation',
-      hemoglobin: 14.5,
-      bloodPressure: '120/80'
-    },
-    {
-      id: 2,
-      donor: { name: 'Sarah Williams', email: 'sarah@email.com', phone: '+1 234-567-8902' },
-      bloodGroup: 'A-',
-      units: 1,
-      type: 'platelets',
-      status: 'processing',
-      date: '2024-08-14T09:00:00',
-      notes: 'First-time platelet donor',
-      hemoglobin: 13.8,
-      bloodPressure: '118/76'
-    },
-    {
-      id: 3,
-      donor: { name: 'David Brown', email: 'david@email.com', phone: '+1 234-567-8903' },
-      bloodGroup: 'B+',
-      units: 1,
-      type: 'whole_blood',
-      status: 'completed',
-      date: '2024-08-13T14:00:00',
-      notes: '',
-      hemoglobin: 15.2,
-      bloodPressure: '125/82'
-    },
-    {
-      id: 4,
-      donor: { name: 'Emily Davis', email: 'emily@email.com', phone: '+1 234-567-8904' },
-      bloodGroup: 'AB+',
-      units: 1,
-      type: 'plasma',
-      status: 'completed',
-      date: '2024-08-13T11:30:00',
-      notes: 'Plasma donation for burn patient',
-      hemoglobin: 14.0,
-      bloodPressure: '115/75'
-    },
-    {
-      id: 5,
-      donor: { name: 'Robert Wilson', email: 'robert@email.com', phone: '+1 234-567-8905' },
-      bloodGroup: 'O-',
-      units: 2,
-      type: 'whole_blood',
-      status: 'rejected',
-      date: '2024-08-12T16:00:00',
-      notes: 'Low hemoglobin level',
-      hemoglobin: 11.5,
-      bloodPressure: '130/85'
-    },
-    {
-      id: 6,
-      donor: { name: 'Jennifer Taylor', email: 'jennifer@email.com', phone: '+1 234-567-8906' },
-      bloodGroup: 'A+',
-      units: 1,
-      type: 'whole_blood',
-      status: 'pending',
-      date: '2024-08-14T14:00:00',
-      notes: 'Scheduled appointment',
-      hemoglobin: null,
-      bloodPressure: null
-    },
-  ];
 
   const getStatusStyle = (status) => {
     switch (status) {

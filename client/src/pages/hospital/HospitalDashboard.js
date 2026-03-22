@@ -70,21 +70,32 @@ const HospitalDashboard = () => {
       
       const [dashboardRes, stockRes, requestsRes, donationsRes] = await Promise.all([
         hospitalAPI.getDashboardStats().catch(() => ({ data: {} })),
-        hospitalAPI.getStock().catch(() => ({ data: { stock: [] } })),
+        hospitalAPI.getStock().catch(() => ({ data: { stocks: [], overview: {} } })),
         hospitalAPI.getRequests({ status: 'pending', limit: 5 }).catch(() => ({ data: { requests: [] } })),
         hospitalAPI.getDonations({ limit: 5 }).catch(() => ({ data: { donations: [] } }))
       ]);
 
-      setStats(dashboardRes.data || {
-        totalStock: 150,
-        lowStock: 3,
-        expiringSoon: 5,
-        pendingRequests: 8,
-        todaysDonations: 12,
-        monthlyDonations: 87
+      const dashboardStats = dashboardRes.data?.stats || {};
+      const stockOverview = stockRes.data?.overview || {};
+
+      setStats({
+        totalStock: stockOverview.availableUnits || 0,
+        lowStock: stockOverview.lowCount || 0,
+        expiringSoon: (stockRes.data?.expiringSoon || []).reduce((sum, item) => sum + (item.count || 0), 0),
+        pendingRequests: dashboardStats.pendingRequests || 0,
+        todaysDonations: dashboardStats.todayDonations || 0,
+        monthlyDonations: Array.isArray(dashboardStats.monthlyDonations)
+          ? dashboardStats.monthlyDonations.reduce((sum, month) => sum + (month.count || 0), 0)
+          : 0
       });
 
-      setBloodStock(stockRes.data?.stock || getDefaultStock());
+      const normalizedStock = (stockRes.data?.stocks || []).map((item) => ({
+        bloodGroup: item.bloodGroup,
+        quantity: item.availableUnits,
+        status: item.status
+      }));
+
+      setBloodStock(normalizedStock);
       setRecentRequests(requestsRes.data?.requests || []);
       setRecentDonations(donationsRes.data?.donations || []);
     } catch (error) {
@@ -93,17 +104,6 @@ const HospitalDashboard = () => {
       setLoading(false);
     }
   };
-
-  const getDefaultStock = () => [
-    { bloodGroup: 'A+', quantity: 25, status: 'adequate' },
-    { bloodGroup: 'A-', quantity: 8, status: 'low' },
-    { bloodGroup: 'B+', quantity: 20, status: 'adequate' },
-    { bloodGroup: 'B-', quantity: 5, status: 'critical' },
-    { bloodGroup: 'AB+', quantity: 12, status: 'adequate' },
-    { bloodGroup: 'AB-', quantity: 3, status: 'critical' },
-    { bloodGroup: 'O+', quantity: 35, status: 'adequate' },
-    { bloodGroup: 'O-', quantity: 10, status: 'adequate' }
-  ];
 
   // Blood Stock Chart
   const stockChartData = {

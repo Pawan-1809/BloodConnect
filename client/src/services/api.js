@@ -82,47 +82,47 @@ export const authAPI = {
   changePassword: (data) => api.put('/auth/change-password', data),
   forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
   resetPassword: (token, password) => api.put(`/auth/reset-password/${token}`, { password }),
-  verifyEmail: (token) => api.get(`/auth/verify-email/${token}`),
-  resendVerification: () => api.post('/auth/resend-verification'),
-  getMyDonorProfile: () => api.get('/auth/my-donor-profile')
+  verifyEmail: () => api.post('/auth/verify-email'),
+  resendVerification: () => api.post('/auth/verify-email'),
+  getMyDonorProfile: () => api.get('/donors/profile')
 };
 
 // ============ DONOR APIs ============
 export const donorAPI = {
   createProfile: (data) => api.post('/donors/profile', data),
   getProfile: () => api.get('/donors/profile'),
-  updateProfile: (data) => api.put('/donors/profile', data),
+  updateProfile: (data) => api.post('/donors/profile', data),
   searchDonors: (params) => api.get('/donors/search', { params }),
-  getNearbyDonors: (params) => api.get('/donors/nearby', { params }),
+  getNearbyDonors: (params) => api.get('/donors/search', { params }),
   getCompatibleDonors: (bloodGroup, params) => api.get(`/donors/compatible/${bloodGroup}`, { params }),
   getDonorById: (id) => api.get(`/donors/${id}`),
-  getDonorStats: (id) => api.get(`/donors/${id}/stats`),
-  getDonationHistory: (id) => api.get(`/donors/${id}/history`),
-  toggleAvailability: () => api.patch('/donors/toggle-availability'),
-  updateHealthDeclaration: (data) => api.put('/donors/health-declaration', data),
+  getDonorStats: () => api.get('/donors/stats'),
+  getDonationHistory: () => api.get('/donors/history'),
+  toggleAvailability: (isAvailable) => api.put('/donors/availability', { isAvailable }),
+  updateHealthDeclaration: (data) => api.post('/donors/profile', { healthDeclaration: data }),
   getLeaderboard: (params) => api.get('/donors/leaderboard', { params }),
   checkEligibility: () => api.get('/donors/check-eligibility'),
-  respondToRequest: (requestId, data) => api.post(`/donors/respond/${requestId}`, data)
+  respondToRequest: (requestId, data) => api.post(`/requests/${requestId}/respond`, data)
 };
 
 // ============ REQUEST APIs ============
 export const requestAPI = {
   create: (data) => api.post('/requests', data),
   getAll: (params) => api.get('/requests', { params }),
-  getMyRequests: (params) => api.get('/requests/my-requests', { params }),
+  getMyRequests: (params) => api.get('/requests', { params }),
   getById: (id) => api.get(`/requests/${id}`),
-  update: (id, data) => api.put(`/requests/${id}`, data),
+  update: (id, data) => api.put(`/requests/${id}/status`, data),
   delete: (id) => api.delete(`/requests/${id}`),
-  updateStatus: (id, status, notes) => api.patch(`/requests/${id}/status`, { status, notes }),
-  respondAsHospital: (id, data) => api.post(`/requests/${id}/hospital-response`, data),
+  updateStatus: (id, status, notes) => api.put(`/requests/${id}/status`, { status, notes }),
+  respondAsHospital: (id, data) => api.put(`/requests/${id}/status`, data),
   getDonorResponses: (id) => api.get(`/requests/${id}/donor-responses`),
   acceptDonor: (requestId, donorId) => api.post(`/requests/${requestId}/accept-donor/${donorId}`),
   cancelDonor: (requestId, donorId) => api.post(`/requests/${requestId}/cancel-donor/${donorId}`),
   getStats: () => api.get('/requests/stats'),
-  getUrgent: () => api.get('/requests/urgent'),
-  broadcastEmergency: (id) => api.post(`/requests/${id}/emergency-broadcast`),
-  getMatched: (params) => api.get('/requests/matched', { params }),
-  getNearby: (params) => api.get('/requests/nearby', { params })
+  getUrgent: () => api.get('/requests/emergency'),
+  broadcastEmergency: (id) => api.put(`/requests/${id}/status`, { status: 'critical', notes: 'Emergency broadcast requested' }),
+  getMatched: (params) => api.get('/requests', { params }),
+  getNearby: (params) => api.get('/requests', { params })
 };
 
 // ============ HOSPITAL APIs ============
@@ -135,20 +135,20 @@ export const hospitalAPI = {
   }),
   getAll: (params) => api.get('/hospitals', { params }),
   getById: (id) => api.get(`/hospitals/${id}`),
-  getNearby: (params) => api.get('/hospitals/nearby', { params }),
-  getStock: () => api.get('/hospitals/stock'),
-  updateStock: (data) => api.post('/hospitals/stock', data),
+  getNearby: (params) => api.get('/hospitals', { params }),
+  getStock: () => api.get('/hospitals/stock/overview'),
+  updateStock: (data) => api.put('/hospitals/stock', data),
   addBloodUnit: (data) => api.post('/hospitals/stock/unit', data),
   updateBloodUnit: (unitId, data) => api.put(`/hospitals/stock/unit/${unitId}`, data),
   deleteBloodUnit: (unitId) => api.delete(`/hospitals/stock/unit/${unitId}`),
   getStockHistory: (params) => api.get('/hospitals/stock/history', { params }),
-  getDashboardStats: () => api.get('/hospitals/dashboard'),
+  getDashboardStats: () => api.get('/hospitals/dashboard/stats'),
   getRequests: (params) => api.get('/hospitals/requests', { params }),
   getDonations: (params) => api.get('/hospitals/donations', { params }),
   createDonation: (data) => api.post('/hospitals/donations', data),
   updateDonation: (id, data) => api.put(`/hospitals/donations/${id}`, data),
-  addReview: (hospitalId, data) => api.post(`/hospitals/${hospitalId}/reviews`, data),
-  getReviews: (hospitalId, params) => api.get(`/hospitals/${hospitalId}/reviews`, { params })
+  addReview: (hospitalId, data) => api.post(`/hospitals/${hospitalId}/review`, data),
+  getReviews: (hospitalId) => api.get(`/hospitals/${hospitalId}`)
 };
 
 // ============ ADMIN APIs ============
@@ -161,13 +161,13 @@ export const adminAPI = {
   deleteUser: (id) => api.delete(`/admin/users/${id}`),
   banUser: (id, data) => api.post(`/admin/users/${id}/ban`, data),
   getHospitals: (params) => api.get('/admin/hospitals', { params }),
-  verifyHospital: (id) => api.post(`/admin/hospitals/${id}/verify`),
+  verifyHospital: (id) => api.put(`/admin/hospitals/${id}/verify`),
   rejectHospital: (id, reason) => api.post(`/admin/hospitals/${id}/reject`, { reason }),
   getAllRequests: (params) => api.get('/admin/requests', { params }),
   getDonations: (params) => api.get('/admin/donations', { params }),
   getSystemHealth: () => api.get('/admin/system-health'),
   getLogs: (params) => api.get('/admin/logs', { params }),
-  createAnnouncement: (data) => api.post('/admin/announcements', data),
+  createAnnouncement: (data) => api.post('/admin/announcement', data),
   getAnnouncements: (params) => api.get('/admin/announcements', { params }),
   updateAnnouncement: (id, data) => api.put(`/admin/announcements/${id}`, data),
   deleteAnnouncement: (id) => api.delete(`/admin/announcements/${id}`),
@@ -181,10 +181,10 @@ export const adminAPI = {
 export const notificationAPI = {
   getAll: (params) => api.get('/notifications', { params }),
   getUnreadCount: () => api.get('/notifications/unread-count'),
-  markAsRead: (id) => api.patch(`/notifications/${id}/read`),
-  markAllAsRead: () => api.patch('/notifications/read-all'),
+  markAsRead: (id) => api.put(`/notifications/${id}/read`),
+  markAllAsRead: () => api.put('/notifications/mark-all-read'),
   delete: (id) => api.delete(`/notifications/${id}`),
-  deleteAll: () => api.delete('/notifications/all'),
+  deleteAll: () => api.delete('/notifications'),
   updatePreferences: (data) => api.put('/notifications/preferences', data),
   getPreferences: () => api.get('/notifications/preferences')
 };
@@ -196,16 +196,16 @@ export const scheduleAPI = {
   getById: (id) => api.get(`/schedules/${id}`),
   update: (id, data) => api.put(`/schedules/${id}`, data),
   delete: (id) => api.delete(`/schedules/${id}`),
-  getUpcoming: (params) => api.get('/schedules/upcoming', { params }),
-  getNearby: (params) => api.get('/schedules/nearby', { params }),
+  getUpcoming: (params) => api.get('/schedules', { params: { ...params, status: 'published' } }),
+  getNearby: (params) => api.get('/schedules', { params }),
   getMySchedules: (params) => api.get('/schedules/my-schedules', { params }),
   bookSlot: (id, data) => api.post(`/schedules/${id}/book`, data),
-  cancelBooking: (id) => api.post(`/schedules/${id}/cancel-booking`),
-  getAvailableSlots: (id, date) => api.get(`/schedules/${id}/slots`, { params: { date } }),
-  createBloodDrive: (data) => api.post('/schedules/blood-drive', data),
-  getBloodDrives: (params) => api.get('/schedules/blood-drives', { params }),
-  registerForDrive: (id) => api.post(`/schedules/blood-drives/${id}/register`),
-  unregisterFromDrive: (id) => api.post(`/schedules/blood-drives/${id}/unregister`),
+  cancelBooking: (id) => api.put(`/schedules/${id}/cancel-booking`),
+  getAvailableSlots: (id, date) => api.get(`/schedules/${id}`, { params: { date } }),
+  createBloodDrive: (data) => api.post('/schedules', data),
+  getBloodDrives: (params) => api.get('/schedules', { params }),
+  registerForDrive: (id, data) => api.post(`/schedules/${id}/book`, data),
+  unregisterFromDrive: (id) => api.put(`/schedules/${id}/cancel-booking`),
   getMyAppointments: (params) => api.get('/schedules/my-appointments', { params })
 };
 

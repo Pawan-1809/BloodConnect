@@ -38,7 +38,9 @@ const bloodStockSchema = new mongoose.Schema({
   
   // Individual Units Tracking
   units: [{
-    unitId: { type: String, required: true, unique: true },
+    // Keep unit IDs required, but do not create a global unique index on nested arrays.
+    // A global unique index on units.unitId blocks initializing multiple stock docs with empty arrays.
+    unitId: { type: String, required: true },
     bagNumber: String,
     
     // Donor Information

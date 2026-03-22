@@ -1,91 +1,67 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import { hospitalAPI, requestAPI } from '../../services/api';
+import toast from 'react-hot-toast';
 
 const ManageRequests = () => {
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showResponseModal, setShowResponseModal] = useState(false);
+  const [fulfillmentNotes, setFulfillmentNotes] = useState('Fulfilled by hospital blood inventory');
 
-  // Mock requests data
-  const requests = [
-    {
-      id: 1,
-      patientName: 'John Doe',
-      bloodType: 'O-',
-      unitsNeeded: 3,
-      unitsFulfilled: 1,
-      urgency: 'critical',
-      requestDate: '2024-12-08',
-      requiredBy: '2024-12-10',
-      status: 'pending',
-      hospital: 'Our Hospital',
-      reason: 'Emergency Surgery',
-      contact: '+1 (555) 123-4567',
-      notes: 'Patient is scheduled for emergency cardiac surgery'
-    },
-    {
-      id: 2,
-      patientName: 'Jane Smith',
-      bloodType: 'A+',
-      unitsNeeded: 2,
-      unitsFulfilled: 2,
-      urgency: 'moderate',
-      requestDate: '2024-12-05',
-      requiredBy: '2024-12-15',
-      status: 'fulfilled',
-      hospital: 'Our Hospital',
-      reason: 'Scheduled Operation',
-      contact: '+1 (555) 987-6543',
-      notes: 'Pre-operative blood preparation'
-    },
-    {
-      id: 3,
-      patientName: 'Mike Johnson',
-      bloodType: 'B+',
-      unitsNeeded: 4,
-      unitsFulfilled: 2,
-      urgency: 'high',
-      requestDate: '2024-12-07',
-      requiredBy: '2024-12-12',
-      status: 'in_progress',
-      hospital: 'City Medical Center',
-      reason: 'Accident Victim',
-      contact: '+1 (555) 456-7890',
-      notes: 'Multiple transfusions required'
-    },
-    {
-      id: 4,
-      patientName: 'Sarah Wilson',
-      bloodType: 'AB-',
-      unitsNeeded: 1,
-      unitsFulfilled: 0,
-      urgency: 'critical',
-      requestDate: '2024-12-09',
-      requiredBy: '2024-12-10',
-      status: 'pending',
-      hospital: 'Our Hospital',
-      reason: 'Post-partum Hemorrhage',
-      contact: '+1 (555) 234-5678',
-      notes: 'Rare blood type - urgent need'
-    },
-    {
-      id: 5,
-      patientName: 'David Brown',
-      bloodType: 'O+',
-      unitsNeeded: 2,
-      unitsFulfilled: 0,
-      urgency: 'low',
-      requestDate: '2024-12-01',
-      requiredBy: '2024-12-20',
-      status: 'cancelled',
-      hospital: 'Our Hospital',
-      reason: 'Elective Surgery',
-      contact: '+1 (555) 345-6789',
-      notes: 'Surgery postponed'
+  React.useEffect(() => {
+    fetchRequests();
+  }, []);
+
+  const fetchRequests = async () => {
+    setLoading(true);
+    try {
+      const response = await hospitalAPI.getRequests({ limit: 200 });
+      const normalized = (response.data?.requests || []).map((item) => ({
+        id: item._id,
+        patientName: item.patientInfo?.name || 'Unknown patient',
+        bloodType: item.bloodGroup,
+        unitsNeeded: item.unitsRequired || 0,
+        unitsFulfilled: item.unitsFulfilled || 0,
+        urgency: item.urgency || 'normal',
+        requestDate: item.createdAt,
+        requiredBy: item.requiredBy,
+        status: item.status,
+        hospital: item.hospitalName,
+        reason: item.reason || item.patientInfo?.medicalCondition || 'Blood requirement',
+        contact: item.contactPhone,
+        notes: item.notes || ''
+      }));
+      setRequests(normalized);
+    } catch (error) {
+      console.error('Error fetching requests:', error);
+      setRequests([]);
+      toast.error('Unable to load hospital requests');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  const handleFulfillRequest = async () => {
+    if (!selectedRequest) {
+      return;
+    }
+
+    try {
+      await requestAPI.updateStatus(selectedRequest.id, 'fulfilled', fulfillmentNotes);
+      toast.success('Request marked as fulfilled');
+      setShowResponseModal(false);
+      setSelectedRequest(null);
+      setFulfillmentNotes('Fulfilled by hospital blood inventory');
+      await fetchRequests();
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Failed to fulfill request');
+    }
+  };
 
   const tabs = [
     { id: 'all', label: 'All Requests', count: requests.length },
@@ -99,8 +75,10 @@ const ManageRequests = () => {
     switch (urgency) {
       case 'critical':
         return 'bg-red-100 text-red-700 border-red-200';
+      case 'urgent':
       case 'high':
         return 'bg-orange-100 text-orange-700 border-orange-200';
+      case 'normal':
       case 'moderate':
         return 'bg-yellow-100 text-yellow-700 border-yellow-200';
       case 'low':
@@ -219,6 +197,11 @@ const ManageRequests = () => {
       </motion.div>
 
       {/* Requests Table */}
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="animate-spin w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full" />
+        </div>
+      ) : (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -346,6 +329,7 @@ const ManageRequests = () => {
           </div>
         )}
       </motion.div>
+      )}
 
       {/* Critical Requests Alert */}
       {requests.filter(r => r.urgency === 'critical' && r.status === 'pending').length > 0 && (
@@ -404,8 +388,10 @@ const ManageRequests = () => {
                     type="number"
                     min="1"
                     max={selectedRequest.unitsNeeded - selectedRequest.unitsFulfilled}
+                    defaultValue={selectedRequest.unitsNeeded - selectedRequest.unitsFulfilled}
                     className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500"
                     placeholder="Enter units"
+                    readOnly
                   />
                 </div>
                 
@@ -428,6 +414,8 @@ const ManageRequests = () => {
                     rows="3"
                     className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500"
                     placeholder="Add any notes..."
+                    value={fulfillmentNotes}
+                    onChange={(e) => setFulfillmentNotes(e.target.value)}
                   />
                 </div>
               </div>
@@ -440,10 +428,7 @@ const ManageRequests = () => {
                   Cancel
                 </button>
                 <button
-                  onClick={() => {
-                    // Handle fulfillment
-                    setShowResponseModal(false);
-                  }}
+                  onClick={handleFulfillRequest}
                   className="flex-1 btn-primary"
                 >
                   Fulfill Request

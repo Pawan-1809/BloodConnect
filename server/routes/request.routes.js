@@ -4,13 +4,14 @@ const { protect, authorize } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { bloodRequestValidation, paginationValidation } = require('../middleware/validators');
 const { CAN_RECEIVE_FROM, NOTIFICATION_TYPES } = require('../config/constants');
+const { requestCreationRateLimiter } = require('../middleware/security');
 
 const router = express.Router();
 
 // @route   POST /api/requests
 // @desc    Create a new blood request
 // @access  Private (Receiver, Hospital)
-router.post('/', protect, authorize('receiver', 'hospital', 'admin'), bloodRequestValidation, asyncHandler(async (req, res) => {
+router.post('/', protect, authorize('receiver', 'hospital', 'admin'), requestCreationRateLimiter, bloodRequestValidation, asyncHandler(async (req, res) => {
   const {
     patientInfo,
     bloodGroup,
@@ -258,6 +259,14 @@ router.get('/:id', protect, asyncHandler(async (req, res) => {
     });
   }
 
+  const access = await canUserAccessRequest(request, req.user);
+  if (!access.allowed) {
+    return res.status(403).json({
+      success: false,
+      message: access.message
+    });
+  }
+
   // Increment view count
   request.viewCount += 1;
   await request.save({ validateBeforeSave: false });
@@ -281,6 +290,16 @@ router.put('/:id/status', protect, authorize('hospital', 'admin'), asyncHandler(
       success: false,
       message: 'Request not found'
     });
+  }
+
+  if (req.user.role === 'hospital') {
+    const hospitalDoc = await Hospital.findOne({ user: req.user.id });
+    if (!hospitalDoc || request.hospital?.toString() !== hospitalDoc._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only update requests linked to your hospital'
+      });
+    }
   }
 
   const oldStatus = request.status;
@@ -344,6 +363,13 @@ router.post('/:id/respond', protect, authorize('donor'), asyncHandler(async (req
     return res.status(404).json({
       success: false,
       message: 'Request not found'
+    });
+  }
+
+  if (!['pending', 'approved', 'in_progress', 'partially_fulfilled'].includes(request.status)) {
+    return res.status(400).json({
+      success: false,
+      message: 'This request is no longer open for donor responses'
     });
   }
 
@@ -517,6 +543,44 @@ async function broadcastToNearbyDonors(request, io) {
   }
 
   return donorsToNotify.length;
+}
+
+async function canUserAccessRequest(request, user) {
+  if (user.role === 'admin') {
+    return { allowed: true };
+  }
+
+  if (user.role === 'receiver' && request.requester.toString() === user.id) {
+    return { allowed: true };
+  }
+
+  if (user.role === 'hospital') {
+    const hospitalDoc = await Hospital.findOne({ user: user.id });
+    const requestHospitalId = request?.hospital?._id
+      ? request.hospital._id.toString()
+      : request?.hospital?.toString?.();
+
+    if (hospitalDoc && requestHospitalId === hospitalDoc._id.toString()) {
+      return { allowed: true };
+    }
+    return { allowed: false, message: 'Not authorized to view this request' };
+  }
+
+  if (user.role === 'donor') {
+    const donorProfile = await DonorProfile.findOne({ user: user.id }).select('bloodGroup');
+    if (!donorProfile) {
+      return { allowed: false, message: 'Complete donor profile to access request details' };
+    }
+
+    const compatibleDonors = CAN_RECEIVE_FROM[request.bloodGroup] || [];
+    if (!compatibleDonors.includes(donorProfile.bloodGroup)) {
+      return { allowed: false, message: 'Request is not compatible with your blood group' };
+    }
+
+    return { allowed: true };
+  }
+
+  return { allowed: false, message: 'Not authorized to view this request' };
 }
 
 module.exports = router;
