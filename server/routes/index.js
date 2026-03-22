@@ -5,6 +5,7 @@ const hospitalRoutes = require('./hospital.routes');
 const adminRoutes = require('./admin.routes');
 const notificationRoutes = require('./notification.routes');
 const scheduleRoutes = require('./schedule.routes');
+const statsRoutes = require('./stats.routes');
 
 module.exports = {
   authRoutes,
@@ -13,5 +14,6 @@ module.exports = {
   hospitalRoutes,
   adminRoutes,
   notificationRoutes,
-  scheduleRoutes
+  scheduleRoutes,
+  statsRoutes
 };

@@ -21,7 +21,8 @@ const {
   hospitalRoutes,
   adminRoutes,
   notificationRoutes,
-  scheduleRoutes
+  scheduleRoutes,
+  statsRoutes
 } = require('./routes');
 
 // Middleware
@@ -148,6 +149,7 @@ app.use('/api/hospitals', hospitalRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/schedules', scheduleRoutes);
+app.use('/api/stats', statsRoutes);
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
@@ -213,6 +215,10 @@ app.get('/api', (req, res) => {
         'GET /api/schedules/:id': 'Get schedule by ID',
         'POST /api/schedules/:id/book': 'Book a slot',
         'PUT /api/schedules/:id/cancel-booking': 'Cancel booking'
+      },
+      stats: {
+        'GET /api/stats/global': 'Get public landing page stats',
+        'GET /api/stats/live': 'Get live public stats summary'
       }
     }
   });
