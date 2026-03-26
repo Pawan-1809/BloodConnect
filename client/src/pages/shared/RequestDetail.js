@@ -149,8 +149,15 @@ const RequestDetail = () => {
   const handleRespond = async (accept) => {
     try {
       setResponding(true);
-      await donorAPI.respondToRequest(id, { accept });
-      toast.success(accept ? 'You accepted this request.' : 'You declined this request.');
+      const response = await donorAPI.respondToRequest(id, { accept });
+      const appointment = response?.data?.appointment;
+      toast.success(
+        accept
+          ? appointment
+            ? 'You accepted this request and your appointment was created.'
+            : 'You accepted this request.'
+          : 'You declined this request.'
+      );
       setShowResponseModal(false);
       fetchRequest();
     } catch (responseError) {

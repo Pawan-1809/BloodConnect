@@ -95,10 +95,21 @@ const FindRequests = () => {
     setResponding(true);
 
     try {
-      await donorAPI.respondToRequest(selectedRequest.id, { accept });
-      toast.success(accept ? 'Response sent successfully.' : 'Request declined.');
+      const response = await donorAPI.respondToRequest(selectedRequest.id, { accept });
+      const appointment = response?.data?.appointment;
+
+      toast.success(
+        accept
+          ? appointment
+            ? 'Response saved and your donation appointment was created.'
+            : 'Response sent successfully.'
+          : 'Request declined.'
+      );
       setShowRespondModal(false);
       setSelectedRequest(null);
+      setRequests((current) =>
+        current.filter((request) => request.id !== selectedRequest.id)
+      );
     } catch (error) {
       toast.error(error.response?.data?.message || 'Unable to respond right now.');
     } finally {

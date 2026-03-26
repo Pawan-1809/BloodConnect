@@ -1,5 +1,5 @@
 const express = require('express');
-const { BloodRequest, User, DonorProfile, Notification, Hospital } = require('../models');
+const { BloodRequest, User, DonorProfile, Notification, Hospital, Schedule } = require('../models');
 const { protect, authorize } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { bloodRequestValidation, paginationValidation } = require('../middleware/validators');
@@ -426,24 +426,42 @@ router.post('/:id/respond', protect, authorize('donor'), asyncHandler(async (req
     d => d.donor.toString() === req.user.id
   );
 
+  const nextResponseStatus = accept ? 'accepted' : 'declined';
+  const previousResponseStatus = existingResponse?.status || null;
+
   if (existingResponse) {
-    existingResponse.status = accept ? 'accepted' : 'declined';
+    existingResponse.status = nextResponseStatus;
     existingResponse.respondedAt = new Date();
   } else {
     request.matchedDonors.push({
       donor: req.user.id,
       donorProfile: donorProfile._id,
-      status: accept ? 'accepted' : 'declined',
+      status: nextResponseStatus,
       notifiedAt: new Date(),
       respondedAt: new Date()
     });
   }
 
-  request.responseCount += 1;
+  if (!previousResponseStatus) {
+    request.responseCount += 1;
+  }
+
+  if (accept && request.status === 'pending') {
+    request.status = 'in_progress';
+    request.statusHistory.push({
+      status: 'in_progress',
+      changedBy: req.user.id,
+      notes: 'A donor accepted this request'
+    });
+  }
+
   await request.save();
 
   // Notify requester
+  let appointment = null;
   if (accept) {
+    appointment = await ensureDonationAppointment(request, req.user.id);
+
     await Notification.create({
       recipient: request.requester,
       type: NOTIFICATION_TYPES.DONOR_MATCHED,
@@ -466,11 +484,31 @@ router.post('/:id/respond', protect, authorize('donor'), asyncHandler(async (req
         donorAccepted: true
       });
     }
+
+    await Notification.create({
+      recipient: req.user.id,
+      type: NOTIFICATION_TYPES.DONATION_SCHEDULED,
+      title: 'Appointment Created',
+      message: `Your donation appointment for ${request.bloodGroup} has been created automatically.`,
+      relatedTo: appointment
+        ? { model: 'Schedule', id: appointment._id }
+        : { model: 'BloodRequest', id: request._id },
+      actionUrl: appointment ? `/schedules/${appointment._id}` : `/requests/${request._id}`
+    });
   }
 
   res.json({
     success: true,
-    message: accept ? 'You have accepted the request' : 'You have declined the request'
+    message: accept ? 'You have accepted the request' : 'You have declined the request',
+    appointment: appointment
+      ? {
+          _id: appointment._id,
+          title: appointment.title,
+          date: appointment.date,
+          startTime: appointment.startTime,
+          venue: appointment.venue
+        }
+      : null
   });
 }));
 
@@ -587,6 +625,67 @@ async function broadcastToNearbyDonors(request, io) {
   }
 
   return donorsToNotify.length;
+}
+
+async function ensureDonationAppointment(request, donorUserId) {
+  const requestIdText = request._id.toString();
+  const existingSchedule = await Schedule.findOne({
+    type: 'donation_appointment',
+    notes: { $regex: requestIdText, $options: 'i' },
+    'slots.participants.user': donorUserId
+  });
+
+  if (existingSchedule) {
+    return existingSchedule;
+  }
+
+  const hospital = request.hospital ? await Hospital.findById(request.hospital).populate('user', 'firstName lastName') : null;
+  const appointmentDate = request.requiredBy ? new Date(request.requiredBy) : new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const venueName = hospital?.name || request.hospitalName || 'BloodConnect Partner Hospital';
+  const venueAddress = hospital?.address?.street || request.hospitalAddress || 'Address shared in request details';
+  const venueCity = hospital?.address?.city || 'Kolkata';
+  const venueState = hospital?.address?.state || 'West Bengal';
+
+  const schedule = await Schedule.create({
+    type: 'donation_appointment',
+    title: `${request.bloodGroup} Donation Appointment`,
+    description: `Auto-generated appointment for request ${requestIdText}.`,
+    organizer: hospital?.user?._id || null,
+    hospital: hospital?._id || null,
+    venue: {
+      name: venueName,
+      address: venueAddress,
+      city: venueCity,
+      state: venueState
+    },
+    location: request.location || hospital?.location || { type: 'Point', coordinates: [0, 0] },
+    date: appointmentDate,
+    startTime: '10:00',
+    endTime: '10:30',
+    totalSlots: 1,
+    availableSlots: 0,
+    slotDuration: 30,
+    slots: [{
+      time: '10:00',
+      capacity: 1,
+      booked: 1,
+      participants: [{
+        user: donorUserId,
+        status: 'confirmed'
+      }]
+    }],
+    status: 'published',
+    isPublic: false,
+    eligibleBloodGroups: [request.bloodGroup],
+    contactPerson: {
+      name: request.contactName || `${hospital?.user?.firstName || ''} ${hospital?.user?.lastName || ''}`.trim() || 'BloodConnect Coordinator',
+      phone: request.contactPhone,
+      email: hospital?.email || ''
+    },
+    notes: `Auto-generated appointment for request ${requestIdText} and donor ${donorUserId}`
+  });
+
+  return schedule;
 }
 
 async function canUserAccessRequest(request, user) {

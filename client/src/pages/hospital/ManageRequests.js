@@ -21,7 +21,7 @@ const ManageRequests = () => {
   const fetchRequests = async () => {
     setLoading(true);
     try {
-      const response = await hospitalAPI.getRequests({ limit: 200 });
+      const response = await hospitalAPI.getRequests({ limit: 100 });
       setProfileReady(true);
       const normalized = (response.data?.requests || []).map((item) => ({
         id: item._id,

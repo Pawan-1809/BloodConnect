@@ -61,7 +61,7 @@ const notificationSchema = new mongoose.Schema({
   
   // Related Entities
   relatedTo: {
-    model: { type: String, enum: ['BloodRequest', 'Donation', 'Hospital', 'User'] },
+    model: { type: String, enum: ['BloodRequest', 'Donation', 'Hospital', 'User', 'Schedule'] },
     id: mongoose.Schema.Types.ObjectId
   },
   
