@@ -19,10 +19,33 @@ const CreateRequest = () => {
   const onSubmit = async (data) => {
     setLoading(true);
     try {
-      await requestAPI.create(data);
+      const requestPayload = {
+        patientInfo: {
+          name: data.anonymous ? 'Anonymous Patient' : data.patientName,
+          age: Number(data.patientAge),
+          gender: data.patientGender || 'other',
+          condition: data.reason
+        },
+        bloodGroup: data.bloodGroup,
+        bloodComponent: data.component || 'whole_blood',
+        unitsRequired: Number(data.units),
+        urgency: data.urgency,
+        hospitalName: data.hospital,
+        hospitalAddress: `${data.hospitalAddress}, ${data.city}`,
+        location: {
+          type: 'Point',
+          coordinates: [0, 0]
+        },
+        contactName: data.patientName,
+        contactPhone: data.contactNumber,
+        requiredBy: new Date(data.requiredBy).toISOString(),
+        medicalNotes: [data.reason, data.additionalDetails].filter(Boolean).join(' - ')
+      };
+
+      await requestAPI.create(requestPayload);
       setShowSuccess(true);
       setTimeout(() => {
-        navigate('/receiver/requests');
+        navigate('/receiver/my-requests');
       }, 3000);
     } catch (error) {
       console.error('Error creating request:', error);
@@ -244,10 +267,10 @@ const CreateRequest = () => {
                       <select
                         {...register('component')}
                         className="input-field"
-                        defaultValue="whole"
+                        defaultValue="whole_blood"
                       >
-                        <option value="whole">Whole Blood</option>
-                        <option value="rbc">Red Blood Cells (RBC)</option>
+                        <option value="whole_blood">Whole Blood</option>
+                        <option value="packed_red_cells">Red Blood Cells (RBC)</option>
                         <option value="plasma">Plasma</option>
                         <option value="platelets">Platelets</option>
                       </select>
@@ -298,14 +321,21 @@ const CreateRequest = () => {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Patient Age
+                          Patient Age *
                         </label>
                         <input
                           type="number"
-                          {...register('patientAge')}
+                          {...register('patientAge', {
+                            required: 'Patient age is required',
+                            min: { value: 0, message: 'Age cannot be negative' },
+                            max: { value: 150, message: 'Enter a valid age' }
+                          })}
                           className="input-field"
                           placeholder="Age in years"
                         />
+                        {errors.patientAge && (
+                          <p className="text-red-500 text-sm mt-1">{errors.patientAge.message}</p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">

@@ -571,7 +571,11 @@ async function canUserAccessRequest(request, user) {
     return { allowed: true };
   }
 
-  if (user.role === 'receiver' && request.requester.toString() === user.id) {
+  const requesterId = request?.requester?._id
+    ? request.requester._id.toString()
+    : request?.requester?.toString?.();
+
+  if (user.role === 'receiver' && requesterId === user.id) {
     return { allowed: true };
   }
 

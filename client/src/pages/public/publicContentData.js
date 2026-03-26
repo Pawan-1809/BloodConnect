@@ -5,6 +5,9 @@ const contactDetails = {
   address: '390 RR Plot, Nirvana Cooperative Society, Anandapur, Kolkata'
 };
 
+const withEmailSubject = (subject) =>
+  `mailto:${contactDetails.email}?subject=${encodeURIComponent(subject)}`;
+
 const publicContentData = {
   about: {
     badge: 'About BloodConnect',
@@ -447,6 +450,11 @@ const publicContentData = {
       'Escalation path for unresolved cases',
       'Direct support contact for critical blockers'
     ],
+    contactDetails,
+    primaryAction: {
+      label: 'Email for Help',
+      href: withEmailSubject('BloodConnect Help Request')
+    },
     sections: [
       {
         title: 'Quick Diagnostic Checklist',
@@ -483,6 +491,10 @@ const publicContentData = {
       'Reliable communication for platform operations'
     ],
     contactDetails,
+    primaryAction: {
+      label: 'Connect With Us',
+      href: withEmailSubject('Connect With BloodConnect')
+    },
     sections: [
       {
         title: 'Best Use Cases',
@@ -518,6 +530,11 @@ const publicContentData = {
       'Fraud signals and suspicious account activity',
       'Operational incidents requiring urgent review'
     ],
+    contactDetails,
+    primaryAction: {
+      label: 'Send Feedback',
+      href: withEmailSubject('BloodConnect Feedback / Bug Report')
+    },
     sections: [
       {
         title: 'What To Include In Report',
@@ -553,6 +570,11 @@ const publicContentData = {
       'City-level emergency response collaboration',
       'Data-informed program planning and reporting'
     ],
+    contactDetails,
+    primaryAction: {
+      label: 'Connect With Us',
+      href: withEmailSubject('BloodConnect Partnership Inquiry')
+    },
     sections: [
       {
         title: 'Partnership Models',

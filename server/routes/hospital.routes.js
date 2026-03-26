@@ -1,5 +1,5 @@
 const express = require('express');
-const { Hospital, BloodStock, User, BloodRequest, Donation, Notification } = require('../models');
+const { Hospital, BloodStock, User, BloodRequest, Donation, Notification, DonorProfile } = require('../models');
 const { protect, authorize } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { hospitalValidation, paginationValidation } = require('../middleware/validators');
@@ -392,6 +392,153 @@ router.get('/donations', protect, authorize('hospital'), paginationValidation, a
     page: parseInt(page, 10),
     pages: Math.ceil(total / limit),
     donations
+  });
+}));
+
+// @route   POST /api/hospitals/donations
+// @desc    Record a donation for my hospital
+// @access  Private (Hospital)
+router.post('/donations', protect, authorize('hospital'), asyncHandler(async (req, res) => {
+  const hospital = await Hospital.findOne({ user: req.user.id }).select('_id name');
+
+  if (!hospital) {
+    return res.status(404).json({
+      success: false,
+      message: 'Hospital not found'
+    });
+  }
+
+  const {
+    donorEmail,
+    donorPhone,
+    bloodGroup,
+    donationType = 'whole_blood',
+    donationDate,
+    hemoglobin,
+    bloodPressure,
+    notes,
+    status = 'scheduled'
+  } = req.body;
+
+  const donor = await User.findOne({
+    role: 'donor',
+    $or: [{ email: donorEmail?.toLowerCase?.() || donorEmail }, { phone: donorPhone }]
+  });
+
+  if (!donor) {
+    return res.status(404).json({
+      success: false,
+      message: 'Registered donor not found. Use the donor email or phone from an existing account.'
+    });
+  }
+
+  const donorProfile = await DonorProfile.findOne({ user: donor._id }).select('_id');
+  if (!donorProfile) {
+    return res.status(400).json({
+      success: false,
+      message: 'This donor has not completed their donor profile yet.'
+    });
+  }
+
+  const [systolic, diastolic] = String(bloodPressure || '')
+    .split('/')
+    .map((value) => Number(value?.trim?.() || value));
+
+  const normalizedStatus = ['scheduled', 'screening', 'completed', 'deferred', 'cancelled'].includes(status)
+    ? status
+    : 'scheduled';
+  const donationId = `DON${Date.now()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+
+  const donation = await Donation.create({
+    donationId,
+    donor: donor._id,
+    donorProfile: donorProfile._id,
+    hospital: hospital._id,
+    bloodGroup,
+    donationType,
+    donationDate: donationDate ? new Date(donationDate) : new Date(),
+    status: normalizedStatus,
+    preScreening: {
+      hemoglobin: hemoglobin ? Number(hemoglobin) : undefined,
+      bloodPressure: Number.isFinite(systolic) && Number.isFinite(diastolic)
+        ? { systolic, diastolic }
+        : undefined,
+      screenedAt: new Date()
+    },
+    collection: {
+      bagNumber: `BAG-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
+    },
+    conductedBy: req.user.id,
+    notes,
+    statusHistory: [{
+      status: normalizedStatus,
+      changedBy: req.user.id,
+      notes: 'Donation recorded by hospital'
+    }]
+  });
+
+  const populatedDonation = await Donation.findById(donation._id)
+    .populate('donor', 'firstName lastName email phone');
+
+  res.status(201).json({
+    success: true,
+    donation: populatedDonation
+  });
+}));
+
+// @route   PUT /api/hospitals/donations/:id
+// @desc    Update donation status/details for my hospital
+// @access  Private (Hospital)
+router.put('/donations/:id', protect, authorize('hospital'), asyncHandler(async (req, res) => {
+  const hospital = await Hospital.findOne({ user: req.user.id }).select('_id');
+
+  if (!hospital) {
+    return res.status(404).json({
+      success: false,
+      message: 'Hospital not found'
+    });
+  }
+
+  const donation = await Donation.findOne({ _id: req.params.id, hospital: hospital._id });
+
+  if (!donation) {
+    return res.status(404).json({
+      success: false,
+      message: 'Donation not found'
+    });
+  }
+
+  const { status, notes } = req.body;
+  const allowedStatuses = ['scheduled', 'screening', 'completed', 'deferred', 'cancelled'];
+
+  if (status && !allowedStatuses.includes(status)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid donation status'
+    });
+  }
+
+  if (status) {
+    donation.status = status;
+    donation.statusHistory.push({
+      status,
+      changedBy: req.user.id,
+      notes: notes || `Donation marked ${status}`
+    });
+  }
+
+  if (notes !== undefined) {
+    donation.notes = notes;
+  }
+
+  await donation.save();
+
+  const populatedDonation = await Donation.findById(donation._id)
+    .populate('donor', 'firstName lastName email phone');
+
+  res.json({
+    success: true,
+    donation: populatedDonation
   });
 }));
 

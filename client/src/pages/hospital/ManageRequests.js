@@ -63,6 +63,16 @@ const ManageRequests = () => {
     }
   };
 
+  const handleCancelRequest = async (request) => {
+    try {
+      await requestAPI.updateStatus(request.id, 'cancelled', 'Cancelled by hospital');
+      toast.success('Request cancelled');
+      await fetchRequests();
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Failed to cancel request');
+    }
+  };
+
   const tabs = [
     { id: 'all', label: 'All Requests', count: requests.length },
     { id: 'pending', label: 'Pending', count: requests.filter(r => r.status === 'pending').length },
@@ -189,8 +199,8 @@ const ManageRequests = () => {
               />
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
             </div>
-            <button className="btn-primary">
-              + New Request
+            <button className="btn-primary" type="button" onClick={fetchRequests}>
+              Refresh
             </button>
           </div>
         </div>
@@ -308,6 +318,7 @@ const ManageRequests = () => {
                       </button>
                       {request.status === 'pending' && (
                         <button
+                          onClick={() => handleCancelRequest(request)}
                           className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           title="Cancel Request"
                         >

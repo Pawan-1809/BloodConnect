@@ -9,6 +9,15 @@ const ManageDonations = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedDonation, setSelectedDonation] = useState(null);
   const [notification, setNotification] = useState(null);
+  const [formData, setFormData] = useState({
+    donorEmail: '',
+    donorPhone: '',
+    bloodGroup: 'A+',
+    donationType: 'whole_blood',
+    hemoglobin: '',
+    bloodPressure: '',
+    notes: ''
+  });
 
   const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -50,11 +59,11 @@ const ManageDonations = () => {
     switch (status) {
       case 'completed':
         return 'bg-green-100 text-green-700';
-      case 'processing':
+      case 'screening':
         return 'bg-blue-100 text-blue-700';
-      case 'pending':
+      case 'scheduled':
         return 'bg-yellow-100 text-yellow-700';
-      case 'rejected':
+      case 'deferred':
         return 'bg-red-100 text-red-700';
       default:
         return 'bg-gray-100 text-gray-700';
@@ -66,7 +75,7 @@ const ManageDonations = () => {
       whole_blood: 'Whole Blood',
       platelets: 'Platelets',
       plasma: 'Plasma',
-      rbc: 'Red Blood Cells'
+      double_red_cells: 'Double Red Cells'
     };
     return types[type] || type;
   };
@@ -78,8 +87,8 @@ const ManageDonations = () => {
   const stats = [
     { label: 'Total Donations', value: donations.length, color: 'blue' },
     { label: 'Completed', value: donations.filter(d => d.status === 'completed').length, color: 'green' },
-    { label: 'Processing', value: donations.filter(d => d.status === 'processing').length, color: 'blue' },
-    { label: 'Pending', value: donations.filter(d => d.status === 'pending').length, color: 'yellow' },
+    { label: 'Screening', value: donations.filter(d => d.status === 'screening').length, color: 'blue' },
+    { label: 'Scheduled', value: donations.filter(d => d.status === 'scheduled').length, color: 'yellow' },
   ];
 
   const showNotification = (type, message) => {
@@ -89,13 +98,69 @@ const ManageDonations = () => {
 
   const handleUpdateStatus = async (donationId, newStatus) => {
     try {
-      // await donationAPI.updateStatus(donationId, newStatus);
+      const response = await hospitalAPI.updateDonation(donationId, { status: newStatus });
+      const updatedDonation = response.data?.donation;
       setDonations(donations.map(d => 
-        d.id === donationId ? { ...d, status: newStatus } : d
+        d.id === donationId ? { ...d, status: updatedDonation?.status || newStatus } : d
       ));
+      if (selectedDonation?.id === donationId) {
+        setSelectedDonation((current) => current ? { ...current, status: updatedDonation?.status || newStatus } : current);
+      }
       showNotification('success', 'Status updated successfully!');
     } catch (error) {
-      showNotification('error', 'Failed to update status');
+      showNotification('error', error?.response?.data?.message || 'Failed to update status');
+    }
+  };
+
+  const handleFormChange = (event) => {
+    const { name, value } = event.target;
+    setFormData((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleRecordDonation = async (event) => {
+    event.preventDefault();
+    try {
+      const response = await hospitalAPI.createDonation({
+        ...formData,
+        hemoglobin: formData.hemoglobin || undefined,
+        bloodPressure: formData.bloodPressure || undefined
+      });
+
+      const item = response.data?.donation;
+      if (item) {
+        setDonations((current) => [{
+          id: item._id,
+          donor: {
+            name: item.donor ? `${item.donor.firstName || ''} ${item.donor.lastName || ''}`.trim() : 'Unknown donor',
+            email: item.donor?.email || 'N/A',
+            phone: item.donor?.phone || 'N/A'
+          },
+          bloodGroup: item.bloodGroup,
+          units: 1,
+          type: item.donationType || 'whole_blood',
+          status: item.status,
+          date: item.donationDate,
+          notes: item.notes || '',
+          hemoglobin: item.preScreening?.hemoglobin ?? null,
+          bloodPressure: item.preScreening?.bloodPressure
+            ? `${item.preScreening.bloodPressure.systolic}/${item.preScreening.bloodPressure.diastolic}`
+            : null
+        }, ...current]);
+      }
+
+      setFormData({
+        donorEmail: '',
+        donorPhone: '',
+        bloodGroup: 'A+',
+        donationType: 'whole_blood',
+        hemoglobin: '',
+        bloodPressure: '',
+        notes: ''
+      });
+      setShowAddModal(false);
+      showNotification('success', 'Donation recorded successfully!');
+    } catch (error) {
+      showNotification('error', error?.response?.data?.message || 'Failed to record donation');
     }
   };
 
@@ -165,10 +230,10 @@ const ManageDonations = () => {
           >
             {[
               { id: 'all', label: 'All Donations' },
-              { id: 'pending', label: 'Pending' },
-              { id: 'processing', label: 'Processing' },
+              { id: 'scheduled', label: 'Scheduled' },
+              { id: 'screening', label: 'Screening' },
               { id: 'completed', label: 'Completed' },
-              { id: 'rejected', label: 'Rejected' },
+              { id: 'deferred', label: 'Deferred' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -272,9 +337,9 @@ const ManageDonations = () => {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                               </svg>
                             </button>
-                            {donation.status === 'pending' && (
+                            {donation.status === 'scheduled' && (
                               <button
-                                onClick={() => handleUpdateStatus(donation.id, 'processing')}
+                                onClick={() => handleUpdateStatus(donation.id, 'screening')}
                                 className="p-2 hover:bg-green-50 rounded-lg transition-colors"
                                 title="Start Processing"
                               >
@@ -283,7 +348,7 @@ const ManageDonations = () => {
                                 </svg>
                               </button>
                             )}
-                            {donation.status === 'processing' && (
+                            {donation.status === 'screening' && (
                               <button
                                 onClick={() => handleUpdateStatus(donation.id, 'completed')}
                                 className="p-2 hover:bg-green-50 rounded-lg transition-colors"
@@ -389,33 +454,33 @@ const ManageDonations = () => {
                     )}
 
                     {/* Status Update */}
-                    {selectedDonation.status !== 'completed' && selectedDonation.status !== 'rejected' && (
+                    {selectedDonation.status !== 'completed' && selectedDonation.status !== 'deferred' && (
                       <div className="p-4 border border-gray-200 rounded-xl">
                         <h4 className="font-semibold text-gray-800 mb-3">Update Status</h4>
                         <div className="flex flex-wrap gap-2">
-                          {selectedDonation.status === 'pending' && (
+                          {selectedDonation.status === 'scheduled' && (
                             <>
                               <button
                                 onClick={() => {
-                                  handleUpdateStatus(selectedDonation.id, 'processing');
-                                  setSelectedDonation({ ...selectedDonation, status: 'processing' });
+                                  handleUpdateStatus(selectedDonation.id, 'screening');
+                                  setSelectedDonation({ ...selectedDonation, status: 'screening' });
                                 }}
                                 className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg font-medium hover:bg-blue-200 transition-colors"
                               >
-                                Start Processing
+                                Start Screening
                               </button>
                               <button
                                 onClick={() => {
-                                  handleUpdateStatus(selectedDonation.id, 'rejected');
-                                  setSelectedDonation({ ...selectedDonation, status: 'rejected' });
+                                  handleUpdateStatus(selectedDonation.id, 'deferred');
+                                  setSelectedDonation({ ...selectedDonation, status: 'deferred' });
                                 }}
                                 className="px-4 py-2 bg-red-100 text-red-700 rounded-lg font-medium hover:bg-red-200 transition-colors"
                               >
-                                Reject
+                                Defer
                               </button>
                             </>
                           )}
-                          {selectedDonation.status === 'processing' && (
+                          {selectedDonation.status === 'screening' && (
                             <button
                               onClick={() => {
                                 handleUpdateStatus(selectedDonation.id, 'completed');
@@ -465,26 +530,22 @@ const ManageDonations = () => {
                     <h3 className="text-xl font-semibold text-white">Record New Donation</h3>
                   </div>
                   
-                  <form className="p-6 space-y-4">
+                  <form className="p-6 space-y-4" onSubmit={handleRecordDonation}>
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Donor Name</label>
-                        <input type="text" className="input-field" placeholder="Enter donor name" />
-                      </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                        <input type="email" className="input-field" placeholder="Email address" />
+                        <input type="email" className="input-field" placeholder="Registered donor email" name="donorEmail" value={formData.donorEmail} onChange={handleFormChange} required />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
-                        <input type="tel" className="input-field" placeholder="Phone number" />
+                        <input type="tel" className="input-field" placeholder="Registered donor phone" name="donorPhone" value={formData.donorPhone} onChange={handleFormChange} required />
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Blood Group</label>
-                        <select className="input-field">
+                        <select className="input-field" name="bloodGroup" value={formData.bloodGroup} onChange={handleFormChange}>
                           {bloodTypes.map(type => (
                             <option key={type} value={type}>{type}</option>
                           ))}
@@ -492,11 +553,11 @@ const ManageDonations = () => {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Donation Type</label>
-                        <select className="input-field">
+                        <select className="input-field" name="donationType" value={formData.donationType} onChange={handleFormChange}>
                           <option value="whole_blood">Whole Blood</option>
                           <option value="platelets">Platelets</option>
                           <option value="plasma">Plasma</option>
-                          <option value="rbc">Red Blood Cells</option>
+                          <option value="double_red_cells">Double Red Cells</option>
                         </select>
                       </div>
                     </div>
@@ -504,17 +565,17 @@ const ManageDonations = () => {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Hemoglobin (g/dL)</label>
-                        <input type="number" step="0.1" className="input-field" placeholder="14.0" />
+                        <input type="number" step="0.1" className="input-field" placeholder="14.0" name="hemoglobin" value={formData.hemoglobin} onChange={handleFormChange} />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Blood Pressure</label>
-                        <input type="text" className="input-field" placeholder="120/80" />
+                        <input type="text" className="input-field" placeholder="120/80" name="bloodPressure" value={formData.bloodPressure} onChange={handleFormChange} />
                       </div>
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
-                      <textarea className="input-field" rows={3} placeholder="Any additional notes..." />
+                      <textarea className="input-field" rows={3} placeholder="Any additional notes..." name="notes" value={formData.notes} onChange={handleFormChange} />
                     </div>
 
                     <div className="flex justify-end space-x-3 pt-4">

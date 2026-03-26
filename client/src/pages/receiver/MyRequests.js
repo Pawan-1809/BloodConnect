@@ -107,7 +107,7 @@ const MyRequests = () => {
 
   const handleCancelRequest = async (requestId) => {
     try {
-      await requestAPI.updateStatus(requestId, 'cancelled', 'Cancelled by receiver');
+      await requestAPI.delete(requestId, { reason: 'Cancelled by receiver' });
       setRequests((current) =>
         current.map((request) =>
           request.id === requestId ? { ...request, status: 'cancelled' } : request

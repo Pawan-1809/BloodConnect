@@ -11,6 +11,10 @@ import {
 } from 'react-icons/fa6';
 import { HiHeart, HiLocationMarker, HiMail, HiPhone } from 'react-icons/hi';
 
+const supportEmail = 'pawankr16123114@gmail.com';
+const createMailto = (subject) =>
+  `mailto:${supportEmail}?subject=${encodeURIComponent(subject)}`;
+
 const footerSections = [
   {
     title: 'Explore',
@@ -44,10 +48,10 @@ const footerSections = [
   {
     title: 'Support',
     links: [
-      { name: 'Help and Troubleshooting', path: '/help' },
-      { name: 'Contact BloodConnect', path: '/contact' },
-      { name: 'Report a Bug or Safety Issue', path: '/report' },
-      { name: 'Partner for Blood Drives', path: '/partners' }
+      { name: 'Help and Troubleshooting', href: createMailto('BloodConnect Help Request') },
+      { name: 'Contact BloodConnect', href: createMailto('Connect With BloodConnect') },
+      { name: 'Report a Bug or Safety Issue', href: createMailto('BloodConnect Feedback / Bug Report') },
+      { name: 'Partner for Blood Drives', href: createMailto('BloodConnect Partnership Inquiry') }
     ]
   }
 ];
@@ -64,19 +68,19 @@ const supportActions = [
   {
     title: 'Need help now?',
     description: 'Use the support center for login, request visibility, and workflow help.',
-    path: '/help',
+    href: createMailto('BloodConnect Help Request'),
     cta: 'Open Help Center'
   },
   {
     title: 'Found a problem?',
     description: 'Report bugs, misuse, or broken flows so BloodConnect stays safe and dependable.',
-    path: '/report',
+    href: createMailto('BloodConnect Feedback / Bug Report'),
     cta: 'Report an Issue'
   },
   {
     title: 'Want to collaborate?',
     description: 'Connect with us for hospital onboarding, blood drives, or local campaigns.',
-    path: '/partners',
+    href: createMailto('BloodConnect Partnership Inquiry'),
     cta: 'Partner With Us'
   }
 ];
@@ -138,12 +142,18 @@ const Footer = () => {
               <ul className="space-y-3">
                 {section.links.map((link) => (
                   <li key={link.name}>
-                    <Link
-                      to={link.path}
-                      className="text-gray-400 hover:text-white transition-colors leading-relaxed"
-                    >
-                      {link.name}
-                    </Link>
+                    {link.href ? (
+                      <a href={link.href} className="text-gray-400 hover:text-white transition-colors leading-relaxed">
+                        {link.name}
+                      </a>
+                    ) : (
+                      <Link
+                        to={link.path}
+                        className="text-gray-400 hover:text-white transition-colors leading-relaxed"
+                      >
+                        {link.name}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -159,12 +169,12 @@ const Footer = () => {
               <div key={action.title} className="rounded-2xl border border-gray-800 bg-gray-950/40 p-5">
                 <h3 className="text-white font-semibold">{action.title}</h3>
                 <p className="text-sm text-gray-400 mt-2 leading-relaxed">{action.description}</p>
-                <Link
-                  to={action.path}
+                <a
+                  href={action.href}
                   className="inline-flex items-center mt-4 text-sm font-semibold text-primary-400 hover:text-primary-300 transition-colors"
                 >
                   {action.cta}
-                </Link>
+                </a>
               </div>
             ))}
           </div>

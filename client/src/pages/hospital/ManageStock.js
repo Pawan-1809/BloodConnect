@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useForm } from 'react-hook-form';
+import { Link } from 'react-router-dom';
 import { hospitalAPI } from '../../services/api';
 
 const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
@@ -12,6 +13,7 @@ const ManageStock = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [notification, setNotification] = useState(null);
+  const [profileReady, setProfileReady] = useState(true);
   
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm();
 
@@ -23,6 +25,7 @@ const ManageStock = () => {
     setLoading(true);
     try {
       const response = await hospitalAPI.getStock();
+      setProfileReady(true);
       const normalized = (response.data?.stocks || []).map((item) => ({
         id: item._id,
         bloodGroup: item.bloodGroup,
@@ -34,6 +37,7 @@ const ManageStock = () => {
       setStock(normalized);
     } catch (error) {
       console.error('Error fetching stock:', error);
+      setProfileReady(error?.response?.status !== 404);
       setStock([]);
     }
     setLoading(false);
@@ -105,7 +109,12 @@ const ManageStock = () => {
       reset();
       showNotification('success', 'Stock updated successfully from hospital inventory input.');
     } catch (error) {
-      showNotification('error', 'Failed to add stock');
+      if (error?.response?.status === 404) {
+        setProfileReady(false);
+        showNotification('error', 'Create your hospital profile first to activate stock management.');
+      } else {
+        showNotification('error', error?.response?.data?.message || 'Failed to add stock');
+      }
     }
   };
 
@@ -138,7 +147,12 @@ const ManageStock = () => {
       reset();
       showNotification('success', 'Stock settings saved successfully!');
     } catch (error) {
-      showNotification('error', 'Failed to update stock');
+      if (error?.response?.status === 404) {
+        setProfileReady(false);
+        showNotification('error', 'Create your hospital profile first to activate stock management.');
+      } else {
+        showNotification('error', error?.response?.data?.message || 'Failed to update stock');
+      }
     }
   };
 
@@ -270,10 +284,26 @@ const ManageStock = () => {
                     </p>
                   </div>
                 </div>
-                <button className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors">
-                  Request Donors
-                </button>
+                <Link to="/hospital/requests" className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors">
+                  Review Requests
+                </Link>
               </div>
+            </motion.div>
+          )}
+
+          {!profileReady && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-5"
+            >
+              <h3 className="text-lg font-semibold text-blue-800">Hospital profile required</h3>
+              <p className="mt-2 text-sm text-blue-700">
+                Stock operations are enabled only after your hospital profile is created.
+              </p>
+              <Link to="/hospital/profile" className="btn-primary inline-flex mt-4">
+                Complete Hospital Profile
+              </Link>
             </motion.div>
           )}
 
