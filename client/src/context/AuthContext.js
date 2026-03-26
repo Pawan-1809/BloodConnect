@@ -3,6 +3,42 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 
 const AuthContext = createContext(null);
+const AUTH_STORAGE_KEYS = {
+  token: 'token',
+  user: 'bloodconnect_user',
+  donorProfile: 'bloodconnect_donor_profile'
+};
+
+const readStoredJson = (key) => {
+  try {
+    const value = localStorage.getItem(key);
+    return value ? JSON.parse(value) : null;
+  } catch (error) {
+    return null;
+  }
+};
+
+const persistAuthSnapshot = ({ token, user, donorProfile }) => {
+  if (token) {
+    localStorage.setItem(AUTH_STORAGE_KEYS.token, token);
+  }
+
+  if (user) {
+    localStorage.setItem(AUTH_STORAGE_KEYS.user, JSON.stringify(user));
+  }
+
+  if (donorProfile) {
+    localStorage.setItem(AUTH_STORAGE_KEYS.donorProfile, JSON.stringify(donorProfile));
+  } else {
+    localStorage.removeItem(AUTH_STORAGE_KEYS.donorProfile);
+  }
+};
+
+const clearAuthSnapshot = () => {
+  localStorage.removeItem(AUTH_STORAGE_KEYS.token);
+  localStorage.removeItem(AUTH_STORAGE_KEYS.user);
+  localStorage.removeItem(AUTH_STORAGE_KEYS.donorProfile);
+};
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -13,10 +49,10 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [donorProfile, setDonorProfile] = useState(null);
+  const [user, setUser] = useState(() => readStoredJson(AUTH_STORAGE_KEYS.user));
+  const [donorProfile, setDonorProfile] = useState(() => readStoredJson(AUTH_STORAGE_KEYS.donorProfile));
   const [loading, setLoading] = useState(true);
-  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [token, setToken] = useState(localStorage.getItem(AUTH_STORAGE_KEYS.token));
 
   const syncAuthState = useCallback(async (authToken, fallbackUser = null) => {
     try {
@@ -30,15 +66,23 @@ export const AuthProvider = ({ children }) => {
       if (response?.data?.user) {
         setUser(response.data.user);
         setDonorProfile(response.data.donorProfile || null);
+        persistAuthSnapshot({
+          token: authToken,
+          user: response.data.user,
+          donorProfile: response.data.donorProfile || null
+        });
         return response.data.user;
       }
 
       setUser(fallbackUser);
       setDonorProfile(null);
+      persistAuthSnapshot({ token: authToken, user: fallbackUser, donorProfile: null });
       return fallbackUser;
     } catch (error) {
-      setUser(fallbackUser);
-      setDonorProfile(null);
+      if (fallbackUser) {
+        setUser(fallbackUser);
+        persistAuthSnapshot({ token: authToken, user: fallbackUser, donorProfile: null });
+      }
       return fallbackUser;
     }
   }, []);
@@ -46,17 +90,30 @@ export const AuthProvider = ({ children }) => {
   // Check authentication on mount
   useEffect(() => {
     const checkAuth = async () => {
-      const storedToken = localStorage.getItem('token');
+      const storedToken = localStorage.getItem(AUTH_STORAGE_KEYS.token);
+      const storedUser = readStoredJson(AUTH_STORAGE_KEYS.user);
+      const storedDonorProfile = readStoredJson(AUTH_STORAGE_KEYS.donorProfile);
+
       if (storedToken) {
+        setToken(storedToken);
+        api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+
+        if (storedUser) {
+          setUser(storedUser);
+          setDonorProfile(storedDonorProfile);
+        }
+
         try {
-          await syncAuthState(storedToken);
-          setToken(storedToken);
+          await syncAuthState(storedToken, storedUser);
         } catch (error) {
           console.error('Auth check failed:', error);
-          localStorage.removeItem('token');
-          delete api.defaults.headers.common['Authorization'];
-          setUser(null);
-          setToken(null);
+          if (!storedUser) {
+            clearAuthSnapshot();
+            delete api.defaults.headers.common['Authorization'];
+            setUser(null);
+            setDonorProfile(null);
+            setToken(null);
+          }
         }
       }
       setLoading(false);
@@ -72,10 +129,10 @@ export const AuthProvider = ({ children }) => {
       const response = await api.post('/auth/login', { email: normalizedEmail, password });
       const { token: newToken, user: userData } = response.data;
 
-      localStorage.setItem('token', newToken);
       api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
       
       setToken(newToken);
+      persistAuthSnapshot({ token: newToken, user: userData, donorProfile: null });
       const syncedUser = await syncAuthState(newToken, userData);
 
       toast.success(`Welcome back, ${syncedUser?.firstName || userData.firstName}!`);
@@ -98,10 +155,10 @@ export const AuthProvider = ({ children }) => {
       const response = await api.post('/auth/register', payload);
       const { token: newToken, user: newUser } = response.data;
 
-      localStorage.setItem('token', newToken);
       api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
       
       setToken(newToken);
+      persistAuthSnapshot({ token: newToken, user: newUser, donorProfile: null });
       const syncedUser = await syncAuthState(newToken, newUser);
 
       toast.success('Registration successful! Welcome to BloodConnect.');
@@ -120,7 +177,7 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      localStorage.removeItem('token');
+      clearAuthSnapshot();
       delete api.defaults.headers.common['Authorization'];
       setUser(null);
       setDonorProfile(null);
@@ -134,6 +191,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await api.put('/auth/update-profile', profileData);
       setUser(response.data.user);
+      persistAuthSnapshot({ token, user: response.data.user, donorProfile });
       toast.success('Profile updated successfully');
       return { success: true, user: response.data.user };
     } catch (error) {
@@ -141,7 +199,7 @@ export const AuthProvider = ({ children }) => {
       toast.error(message);
       return { success: false, message };
     }
-  }, []);
+  }, [donorProfile, token]);
 
   // Change password
   const changePassword = useCallback(async (currentPassword, newPassword) => {
@@ -179,14 +237,19 @@ export const AuthProvider = ({ children }) => {
 
       if (response?.data?.user) {
         setUser(response.data.user);
-        setDonorProfile(response.data.donorProfile);
+        setDonorProfile(response.data.donorProfile || null);
+        persistAuthSnapshot({
+          token,
+          user: response.data.user,
+          donorProfile: response.data.donorProfile || null
+        });
       }
       return response.data;
     } catch (error) {
       console.error('Refresh user failed:', error);
       return null;
     }
-  }, []);
+  }, [token]);
 
   const value = {
     user,

@@ -32,6 +32,29 @@ router.post('/', protect, authorize('receiver', 'hospital', 'admin'), requestCre
     broadcastRadius
   } = req.body;
 
+  let resolvedHospitalId = hospital;
+  let resolvedHospitalName = hospitalName;
+  let resolvedHospitalAddress = hospitalAddress;
+  let resolvedLocation = location;
+  let resolvedContactName = contactName;
+
+  if (req.user.role === 'hospital') {
+    const hospitalDoc = await Hospital.findOne({ user: req.user.id });
+
+    if (!hospitalDoc) {
+      return res.status(404).json({
+        success: false,
+        message: 'Hospital profile not found. Please complete hospital registration first.'
+      });
+    }
+
+    resolvedHospitalId = hospitalDoc._id;
+    resolvedHospitalName = hospitalDoc.name;
+    resolvedHospitalAddress = `${hospitalDoc.address?.street || ''}, ${hospitalDoc.address?.city || ''}`.replace(/^,\s*|,\s*$/g, '');
+    resolvedLocation = hospitalDoc.location || location;
+    resolvedContactName = contactName || `${req.user.firstName} ${req.user.lastName}`.trim();
+  }
+
   const request = await BloodRequest.create({
     requester: req.user.id,
     patientInfo,
@@ -39,11 +62,11 @@ router.post('/', protect, authorize('receiver', 'hospital', 'admin'), requestCre
     bloodComponent,
     unitsRequired,
     urgency,
-    hospital,
-    hospitalName,
-    hospitalAddress,
-    location,
-    contactName,
+    hospital: resolvedHospitalId,
+    hospitalName: resolvedHospitalName,
+    hospitalAddress: resolvedHospitalAddress,
+    location: resolvedLocation,
+    contactName: resolvedContactName,
     contactPhone,
     alternatePhone,
     requiredBy: new Date(requiredBy),
@@ -69,7 +92,7 @@ router.post('/', protect, authorize('receiver', 'hospital', 'admin'), requestCre
       requestId: request._id,
       bloodGroup,
       urgency,
-      city: location?.city || hospitalAddress
+      city: resolvedLocation?.city || resolvedHospitalAddress
     });
   }
 

@@ -39,13 +39,15 @@ api.interceptors.response.use(
       requestUrl.includes('/auth/register') ||
       requestUrl.includes('/auth/forgot-password') ||
       requestUrl.includes('/auth/reset-password');
+    const isSessionBootstrapRequest = requestUrl.includes('/auth/me');
     
     if (status === 401) {
       // Only treat 401 as "session expired" if we previously had a token and the request
       // was not an auth/login/register flow.
-      if (hadToken && !isAuthEndpoint) {
+      if (hadToken && !isAuthEndpoint && !isSessionBootstrapRequest) {
         localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        localStorage.removeItem('bloodconnect_user');
+        localStorage.removeItem('bloodconnect_donor_profile');
 
         // Avoid hard refresh loops if we're already on /login
         if (window.location.pathname !== '/login') {

@@ -15,6 +15,138 @@ const {
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const STATES = ['West Bengal', 'Karnataka', 'Maharashtra', 'Delhi'];
 const CITIES = ['Kolkata', 'Howrah', 'Bengaluru', 'Mumbai', 'New Delhi'];
+const KOLKATA_HOSPITALS = [
+  {
+    name: 'Apollo Multispeciality Hospitals Kolkata',
+    type: 'hospital',
+    registrationNumber: 'KOL-APOLLO-001',
+    street: '58 Canal Circular Road',
+    city: 'Kolkata',
+    state: 'West Bengal',
+    zipCode: '700054',
+    phone: '+913323218888',
+    emergencyPhone: '+913323218999',
+    coordinates: [88.3924, 22.5739],
+    bloodStorageCapacity: 420
+  },
+  {
+    name: 'Fortis Hospital Anandapur',
+    type: 'hospital',
+    registrationNumber: 'KOL-FORTIS-002',
+    street: '730 Eastern Metropolitan Bypass, Anandapur',
+    city: 'Kolkata',
+    state: 'West Bengal',
+    zipCode: '700107',
+    phone: '+913366288444',
+    emergencyPhone: '+913366288555',
+    coordinates: [88.4004, 22.5146],
+    bloodStorageCapacity: 380
+  },
+  {
+    name: 'Ruby General Hospital',
+    type: 'hospital',
+    registrationNumber: 'KOL-RUBY-003',
+    street: 'Kasba Golpark, E M Bypass',
+    city: 'Kolkata',
+    state: 'West Bengal',
+    zipCode: '700107',
+    phone: '+913324450101',
+    emergencyPhone: '+913324450111',
+    coordinates: [88.3929, 22.5142],
+    bloodStorageCapacity: 300
+  },
+  {
+    name: 'AMRI Hospital Dhakuria',
+    type: 'hospital',
+    registrationNumber: 'KOL-AMRI-004',
+    street: 'P-4 and 5, Gariahat Road',
+    city: 'Kolkata',
+    state: 'West Bengal',
+    zipCode: '700029',
+    phone: '+913366220000',
+    emergencyPhone: '+913366220111',
+    coordinates: [88.3698, 22.5127],
+    bloodStorageCapacity: 310
+  },
+  {
+    name: 'Medica Superspecialty Hospital',
+    type: 'hospital',
+    registrationNumber: 'KOL-MEDICA-005',
+    street: '127 Mukundapur, E M Bypass',
+    city: 'Kolkata',
+    state: 'West Bengal',
+    zipCode: '700099',
+    phone: '+913366550000',
+    emergencyPhone: '+913366550111',
+    coordinates: [88.4035, 22.4838],
+    bloodStorageCapacity: 360
+  },
+  {
+    name: 'Peerless Hospital',
+    type: 'hospital',
+    registrationNumber: 'KOL-PEERLESS-006',
+    street: '360 Panchasayar',
+    city: 'Kolkata',
+    state: 'West Bengal',
+    zipCode: '700094',
+    phone: '+913340170000',
+    emergencyPhone: '+913340170111',
+    coordinates: [88.4078, 22.4767],
+    bloodStorageCapacity: 290
+  },
+  {
+    name: 'CMRI Hospital Kolkata',
+    type: 'hospital',
+    registrationNumber: 'KOL-CMRI-007',
+    street: '7/2 Diamond Harbour Road',
+    city: 'Kolkata',
+    state: 'West Bengal',
+    zipCode: '700027',
+    phone: '+913330990999',
+    emergencyPhone: '+913330991111',
+    coordinates: [88.3307, 22.5164],
+    bloodStorageCapacity: 270
+  },
+  {
+    name: 'Belle Vue Clinic',
+    type: 'hospital',
+    registrationNumber: 'KOL-BELLEVUE-008',
+    street: '9 Loudon Street',
+    city: 'Kolkata',
+    state: 'West Bengal',
+    zipCode: '700017',
+    phone: '+913322870000',
+    emergencyPhone: '+913322870111',
+    coordinates: [88.3578, 22.5394],
+    bloodStorageCapacity: 250
+  },
+  {
+    name: 'Woodlands Multispeciality Hospital',
+    type: 'hospital',
+    registrationNumber: 'KOL-WOODLANDS-009',
+    street: '8/5 Alipore Road',
+    city: 'Kolkata',
+    state: 'West Bengal',
+    zipCode: '700027',
+    phone: '+913340306000',
+    emergencyPhone: '+913340306111',
+    coordinates: [88.3375, 22.5236],
+    bloodStorageCapacity: 240
+  },
+  {
+    name: 'Desun Hospital Kolkata',
+    type: 'hospital',
+    registrationNumber: 'KOL-DESUN-010',
+    street: 'Desun More, Kasba Golpark, E M Bypass',
+    city: 'Kolkata',
+    state: 'West Bengal',
+    zipCode: '700107',
+    phone: '+913371242424',
+    emergencyPhone: '+913371242525',
+    coordinates: [88.3948, 22.5098],
+    bloodStorageCapacity: 280
+  }
+];
 
 const FIRST_NAMES = ['Aarav', 'Diya', 'Rohan', 'Isha', 'Rahul', 'Neha', 'Arjun', 'Sneha', 'Karan', 'Meera'];
 const LAST_NAMES = ['Sharma', 'Gupta', 'Roy', 'Mukherjee', 'Das', 'Singh', 'Nair', 'Khan', 'Patel', 'Verma'];
@@ -153,40 +285,55 @@ async function seed() {
 
   // Hospital users + hospitals
   const hospitals = [];
-  for (let i = 0; i < 4; i += 1) {
+  for (let i = 0; i < KOLKATA_HOSPITALS.length; i += 1) {
+    const hospitalSeed = KOLKATA_HOSPITALS[i];
     const hospitalUser = await User.create(
       makeUser({
         role: 'hospital',
         firstName: `Hospital${i + 1}`,
-        lastName: 'Manager'
+        lastName: 'Manager',
+        email: `hospital${i + 1}@gmail.com`,
+        password: 'Hospital@123',
+        phone: hospitalSeed.phone,
+        address: {
+          street: hospitalSeed.street,
+          city: hospitalSeed.city,
+          state: hospitalSeed.state,
+          country: 'India',
+          zipCode: hospitalSeed.zipCode
+        },
+        location: {
+          type: 'Point',
+          coordinates: hospitalSeed.coordinates
+        }
       })
     );
 
     const hospital = await Hospital.create({
       user: hospitalUser._id,
-      name: `${pick(['CityCare', 'LifeLine', 'Apollo', 'RedCross'])} ${pick(['Hospital', 'Blood Bank'])}`,
-      type: pick(['hospital', 'blood_bank']),
-      registrationNumber: `HOSP-${Date.now()}-${i}`,
+      name: hospitalSeed.name,
+      type: hospitalSeed.type,
+      registrationNumber: hospitalSeed.registrationNumber,
       email: hospitalUser.email,
       phone: hospitalUser.phone,
-      emergencyPhone: randomPhone(),
+      emergencyPhone: hospitalSeed.emergencyPhone,
       address: {
-        street: `${random(20, 450)} ${pick(['Bypass Road', 'Hospital Avenue', 'Central Road'])}`,
-        city: pick(CITIES),
-        state: pick(STATES),
+        street: hospitalSeed.street,
+        city: hospitalSeed.city,
+        state: hospitalSeed.state,
         country: 'India',
-        zipCode: String(random(100000, 999999))
+        zipCode: hospitalSeed.zipCode
       },
       location: {
         type: 'Point',
-        coordinates: randomLocation()
+        coordinates: hospitalSeed.coordinates
       },
       hasBloodBank: true,
       hasDonationCenter: true,
       isVerified: true,
       verifiedBy: adminUser._id,
       verifiedAt: new Date(),
-      bloodStorageCapacity: random(150, 500)
+      bloodStorageCapacity: hospitalSeed.bloodStorageCapacity
     });
 
     hospitals.push({ hospital, hospitalUser });
@@ -409,7 +556,9 @@ async function seed() {
   console.log('Seed completed successfully.');
   console.log('Created:');
   console.log('- 1 admin user');
-  console.log(`- ${hospitals.length} hospitals (+ hospital users)`);
+  console.log(`- ${hospitals.length} Kolkata hospitals (+ hospital users)`);
+  console.log('- Hospital login pattern: hospital1@gmail.com ... hospital10@gmail.com');
+  console.log('- Shared hospital password: Hospital@123');
   console.log(`- ${receivers.length} receivers`);
   console.log(`- ${donorProfiles.length} donors + donor profiles`);
   console.log(`- ${requests.length} blood requests (includes pending emergency/critical)`);

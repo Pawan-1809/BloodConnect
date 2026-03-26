@@ -105,6 +105,7 @@ const Sidebar = ({ isOpen = true, onClose }) => {
           {
             title: 'Operations',
             items: [
+              { name: 'New Request', path: '/hospital/requests/new', icon: HiPlus },
               { name: 'Requests', path: '/hospital/requests', icon: HiClipboardList },
               { name: 'Donations', path: '/hospital/donations', icon: HiHeart },
               { name: 'Schedules', path: '/hospital/schedules', icon: HiCalendar },

@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 const ManageRequests = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [profileReady, setProfileReady] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRequest, setSelectedRequest] = useState(null);
@@ -21,6 +22,7 @@ const ManageRequests = () => {
     setLoading(true);
     try {
       const response = await hospitalAPI.getRequests({ limit: 200 });
+      setProfileReady(true);
       const normalized = (response.data?.requests || []).map((item) => ({
         id: item._id,
         patientName: item.patientInfo?.name || 'Unknown patient',
@@ -40,7 +42,11 @@ const ManageRequests = () => {
     } catch (error) {
       console.error('Error fetching requests:', error);
       setRequests([]);
-      toast.error('Unable to load hospital requests');
+      if (error?.response?.status === 404) {
+        setProfileReady(false);
+      } else {
+        toast.error(error?.response?.data?.message || 'Unable to load hospital requests');
+      }
     } finally {
       setLoading(false);
     }
@@ -199,12 +205,27 @@ const ManageRequests = () => {
               />
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
             </div>
+            <Link to="/hospital/requests/new" className="btn-secondary">
+              + New Request
+            </Link>
             <button className="btn-primary" type="button" onClick={fetchRequests}>
               Refresh
             </button>
           </div>
         </div>
       </motion.div>
+
+      {!profileReady && (
+        <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-5">
+          <h3 className="text-lg font-semibold text-blue-800">Hospital profile required</h3>
+          <p className="mt-2 text-sm text-blue-700">
+            Create your hospital profile first so requests can be linked to your facility.
+          </p>
+          <Link to="/hospital/profile" className="btn-primary inline-flex mt-4">
+            Complete Hospital Profile
+          </Link>
+        </div>
+      )}
 
       {/* Requests Table */}
       {loading ? (

@@ -137,6 +137,7 @@ function App() {
           <Route path="/hospital/stock" element={<Layout><ManageStock /></Layout>} />
           <Route path="/hospital/stock/add" element={<Navigate to="/hospital/stock" replace />} />
           <Route path="/hospital/stock/history" element={<Navigate to="/hospital/stock" replace />} />
+          <Route path="/hospital/requests/new" element={<Layout><CreateRequest /></Layout>} />
           <Route path="/hospital/requests" element={<Layout><ManageRequests /></Layout>} />
           <Route path="/hospital/donations" element={<Layout><ManageDonations /></Layout>} />
           <Route path="/hospital/schedules" element={<Layout><HospitalSchedules /></Layout>} />

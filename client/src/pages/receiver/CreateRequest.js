@@ -1,20 +1,55 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { requestAPI } from '../../services/api';
+import { requestAPI, hospitalAPI } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
 const CreateRequest = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const { register, handleSubmit, watch, formState: { errors } } = useForm();
+  const [hospitalProfileReady, setHospitalProfileReady] = useState(user?.role !== 'hospital');
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm();
   
   const urgency = watch('urgency');
   const bloodGroup = watch('bloodGroup');
+  const isHospitalUser = user?.role === 'hospital';
+
+  useEffect(() => {
+    const loadHospitalDefaults = async () => {
+      if (!isHospitalUser) {
+        return;
+      }
+
+      try {
+        const response = await hospitalAPI.getProfile();
+        const hospital = response.data?.hospital;
+        if (!hospital) {
+          setHospitalProfileReady(false);
+          return;
+        }
+
+        setHospitalProfileReady(true);
+        setValue('hospital', hospital.name || '');
+        setValue(
+          'hospitalAddress',
+          [hospital.address?.street, hospital.address?.state].filter(Boolean).join(', ')
+        );
+        setValue('city', hospital.address?.city || '');
+        setValue('contactNumber', hospital.emergencyPhone || hospital.phone || '');
+        setValue('patientName', hospital.name || 'Hospital Coordinator');
+      } catch (error) {
+        setHospitalProfileReady(false);
+      }
+    };
+
+    loadHospitalDefaults();
+  }, [isHospitalUser, setValue]);
 
   const onSubmit = async (data) => {
     setLoading(true);
@@ -45,7 +80,7 @@ const CreateRequest = () => {
       await requestAPI.create(requestPayload);
       setShowSuccess(true);
       setTimeout(() => {
-        navigate('/receiver/my-requests');
+        navigate(isHospitalUser ? '/hospital/requests' : '/receiver/my-requests');
       }, 3000);
     } catch (error) {
       console.error('Error creating request:', error);
@@ -103,14 +138,23 @@ const CreateRequest = () => {
 
   return (
     <div className="p-6 lg:p-8">
+          {isHospitalUser && !hospitalProfileReady && (
+            <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-800">
+              Complete your hospital profile first so new requests can be linked to your hospital correctly.
+            </div>
+          )}
           {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="mb-8"
           >
-            <h1 className="text-3xl font-bold text-gray-800">Create Blood Request</h1>
-            <p className="text-gray-600 mt-1">Fill in the details to find compatible donors</p>
+            <h1 className="text-3xl font-bold text-gray-800">
+              {isHospitalUser ? 'Create Hospital Blood Request' : 'Create Blood Request'}
+            </h1>
+            <p className="text-gray-600 mt-1">
+              Fill in the details to find compatible donors
+            </p>
           </motion.div>
 
           {/* Progress Steps */}
@@ -310,7 +354,7 @@ const CreateRequest = () => {
                         type="text"
                         {...register('patientName', { required: 'Patient name is required' })}
                         className="input-field"
-                        placeholder="Enter patient's full name"
+                        placeholder={isHospitalUser ? 'Patient or coordinator name' : "Enter patient's full name"}
                       />
                       {errors.patientName && (
                         <p className="text-red-500 text-sm mt-1">{errors.patientName.message}</p>
@@ -459,6 +503,7 @@ const CreateRequest = () => {
                         {...register('hospital', { required: 'Hospital name is required' })}
                         className="input-field"
                         placeholder="Enter hospital or blood bank name"
+                        readOnly={isHospitalUser && hospitalProfileReady}
                       />
                       {errors.hospital && (
                         <p className="text-red-500 text-sm mt-1">{errors.hospital.message}</p>
@@ -475,6 +520,7 @@ const CreateRequest = () => {
                         className="input-field"
                         rows={2}
                         placeholder="Full address for donors to locate"
+                        readOnly={isHospitalUser && hospitalProfileReady}
                       />
                       {errors.hospitalAddress && (
                         <p className="text-red-500 text-sm mt-1">{errors.hospitalAddress.message}</p>
@@ -491,6 +537,7 @@ const CreateRequest = () => {
                         {...register('city', { required: 'City is required' })}
                         className="input-field"
                         placeholder="City name"
+                        readOnly={isHospitalUser && hospitalProfileReady}
                       />
                       {errors.city && (
                         <p className="text-red-500 text-sm mt-1">{errors.city.message}</p>
@@ -587,7 +634,7 @@ const CreateRequest = () => {
                     </button>
                     <button
                       type="submit"
-                      disabled={loading}
+                      disabled={loading || (isHospitalUser && !hospitalProfileReady)}
                       className="btn-primary min-w-[160px]"
                     >
                       {loading ? (

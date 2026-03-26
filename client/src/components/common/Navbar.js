@@ -81,6 +81,7 @@ const Navbar = () => {
       ],
       hospital: [
         { name: 'Dashboard', path: '/hospital/dashboard', icon: HiHome },
+        { name: 'New Request', path: '/hospital/requests/new', icon: HiPlus },
         { name: 'Blood Stock', path: '/hospital/stock', icon: HiCollection },
         { name: 'Requests', path: '/hospital/requests', icon: HiClipboardList },
         { name: 'Donations', path: '/hospital/donations', icon: HiHeart }
