@@ -66,6 +66,18 @@ If upgrading from older DB schemas, run once:
 
 ```bash
 npm run db:fix-indexes
+
+Seed sample data:
+
+```bash
+npm run db:seed
+```
+
+Seed or refresh only the 10 Kolkata hospital accounts and stock without wiping the rest of the database:
+
+```bash
+npm run db:seed:hospitals
+```
 ```
 
 ## One-Click Deployment
