@@ -36,3 +36,5 @@ client/.vercel/
 
 # test/coverage
 coverage/
+
+ARCHITECTURE.md

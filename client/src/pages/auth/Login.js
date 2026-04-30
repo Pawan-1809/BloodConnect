@@ -207,15 +207,15 @@ const Login = () => {
           {/* Stats */}
           <div className="grid grid-cols-3 gap-4 text-center">
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-              <p className="text-3xl font-bold">15K+</p>
+              <p className="text-3xl font-bold">0</p>
               <p className="text-primary-200 text-sm">Lives Saved</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-              <p className="text-3xl font-bold">8.5K</p>
+              <p className="text-3xl font-bold">5</p>
               <p className="text-primary-200 text-sm">Active Donors</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-              <p className="text-3xl font-bold">450+</p>
+              <p className="text-3xl font-bold">10</p>
               <p className="text-primary-200 text-sm">Hospitals</p>
             </div>
           </div>
